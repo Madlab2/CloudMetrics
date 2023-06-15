@@ -11,9 +11,16 @@ This suite is only developped/tested on Windows
 
 ## How to use
 Clone the repository and change your docker mount in the devcontainer.json file. Then build as a devcontainer in VSCode. Use the jupyter notebook for manipulations and plotting of your labelled .las point clouds. \
-Currently, operations like ConvexHull and Haussdorff Metric computation are too intensive to be performed in the notebook. To run a dedicated script, open a terminal and run
+Currently, operations like ConvexHull and Haussdorff Metric computation are too intensive to be performed in the notebook. There are two scripts, one for computing the convex hulls of the two poitn clouds, one for computing the haussdrof Distance using these hulls.\
+To run the hull compution script, open a terminal and run
 ```bash
 cd src
-python3 test_hull_script.py
+python3 compute_convex_hulls.py <path/to/pc_1> <path/to/pc_2>
 ```
-Depending on your point cloud siz, this can take a long time. Note that you need to adapt input and file saving paths in the script manually beforehand.
+This saves the two hulls as .pkl files to your disc into the respective point cloud paths. \
+Afterwards you can run
+```bash
+cd src
+python3 compute_haussdorff.py <path/to/pc_1> <path/to/pc_2> <path/to/hull_1> <path/to/hull_2> 
+```
+Depending on your point cloud size, these scripts can take a long time.
