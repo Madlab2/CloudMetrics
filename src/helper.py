@@ -71,27 +71,6 @@ def crop_points(points, bounding_box):
 
     return points[mask]
 
-def hausdorff_distance(point_set1, point_set2, hull1, hull2):
-    """
-    Compute the Hausdorff distance between two point sets.
-    
-    The Hausdorff distance is a measure of dissimilarity between two sets of points in a metric space. It represents the
-    maximum distance between a point in one set and its closest point in the other set.
-    
-    Parameters:
-        point_set1 (ndarray): Array of shape (N, 3) representing the first set of points.
-        point_set2 (ndarray): Array of shape (M, 3) representing the second set of points.
-        hull1 (scipy.spatial.ConvexHull): Pre-computed ConvexHull object for point_set1.
-        hull2 (scipy.spatial.ConvexHull): Pre-computed ConvexHull object for point_set2.
-    
-    Returns:
-        float: The Hausdorff distance between the two point sets.
-    """
-    distance1 = directed_hausdorff(point_set1, point_set2[hull2.vertices])[0]
-    distance2 = directed_hausdorff(point_set2, point_set1[hull1.vertices])[0]
-
-    return max(distance1, distance2)
-
 
 def import_and_prepare_point_clouds(path_pc_1, path_pc_2):
     """
