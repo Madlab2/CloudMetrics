@@ -124,7 +124,7 @@ def test_script(path_pc1, path_pc2, classes):
         partition = np.column_stack((real_xyz_cropped[start_idx:end_idx]['x'],
                                  real_xyz_cropped[start_idx:end_idx]['y'],
                                  real_xyz_cropped[start_idx:end_idx]['z']))
-        
+
         if convex_hull_real is None:
             convex_hull_real = ConvexHull(partition, incremental=True)
         else:
@@ -138,14 +138,25 @@ def test_script(path_pc1, path_pc2, classes):
     print(f"ConvexHull real data saved to: {convex_hull_path_real}")
 
     print("Computing ConvexHull for synth_xyz_cropped...")
-    with tqdm(total=len(synth_xyz_cropped)) as pbar:
-        def update_progress(_):
-            pbar.update(1)
-        convex_hull_synth = ConvexHull(synth_xyz_cropped, incremental=True)
-        pbar.close()
+    convex_hull_synth = None
+    partition_size = len(synth_xyz_cropped) // num_partitions
+    for i in tqdm(range(num_partitions)):
+        start_idx = i * partition_size
+        end_idx = (i + 1) * partition_size
+        partition = np.column_stack((synth_xyz_cropped[start_idx:end_idx]['x'],
+                                 synth_xyz_cropped[start_idx:end_idx]['y'],
+                                 synth_xyz_cropped[start_idx:end_idx]['z']))
+        
+        if convex_hull_synth is None:
+            convex_hull_synth = ConvexHull(partition, incremental=True)
+        else:
+            convex_hull_synth.add_points(partition, restart=False)
+
+    # Close the convex hull computation
+    convex_hull_synth.close()
 
     with open(convex_hull_path_synth, "wb") as file:
-        pickle.dump(convex_hull_path_synth, file)
+        pickle.dump(convex_hull_synth, file)
     print(f"ConvexHull synth data saved to: {convex_hull_path_synth}")
 
     return hausdorff_distance(real_xyz_cropped, synth_xyz_cropped, convex_hull_real, convex_hull_synth)
