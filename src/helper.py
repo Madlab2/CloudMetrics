@@ -1,10 +1,12 @@
+#!/usr/bin/env python
 import numpy as np
 import laspy
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
+import classes
 
 
-def plot_bev(points, class_descriptions):
+def plot_bev(points):
     """
     Plot a Bird's Eye View (BEV) of a point cloud with colorization based on semantic labels.
     Parameters:
@@ -29,7 +31,7 @@ def plot_bev(points, class_descriptions):
 
     # Add a legend for the semantic labels
     legend_colors = scatter.legend_elements(prop='colors')[0]
-    plt.legend(legend_colors, list(class_descriptions.values()), loc='upper right', title='Classes')
+    plt.legend(legend_colors, list(classes.CLASS_DESCRIPTIONS.values()), loc='upper right', title='Classes')
 
     plt.xlabel('X')
     plt.ylabel('Y')
@@ -50,8 +52,9 @@ def crop_points(points, bounding_box):
         LasPointRecord: The cropped point cloud data points containing points within the specified bounding box.
     
     Note:
-        The function preserves all the data in the `points` object, including x, y, z coordinates, intensity,
+        - The function preserves all the data in the `points` object, including x, y, z coordinates, intensity,
         classification, and any other available attributes, for the points that are within the specified bounding box.
+        - Header Information of the point cloud is not updated (e.g. min and max values)
     """
     # Extract x, y, z coordinates from points
     x = points.x
@@ -68,7 +71,7 @@ def crop_points(points, bounding_box):
 
     return points[mask]
 
-def hausdorff_distance(point_set1, point_set2, hull1=None, hull2=None):
+def hausdorff_distance(point_set1, point_set2, hull1, hull2):
     """
     Compute the Hausdorff distance between two point sets.
     
@@ -78,27 +81,62 @@ def hausdorff_distance(point_set1, point_set2, hull1=None, hull2=None):
     Parameters:
         point_set1 (ndarray): Array of shape (N, 3) representing the first set of points.
         point_set2 (ndarray): Array of shape (M, 3) representing the second set of points.
-        hull1 (scipy.spatial.ConvexHull, optional): Pre-computed ConvexHull object for point_set1. If not provided, it
-            will be computed internally.
-        hull2 (scipy.spatial.ConvexHull, optional): Pre-computed ConvexHull object for point_set2. If not provided, it
-            will be computed internally.
+        hull1 (scipy.spatial.ConvexHull): Pre-computed ConvexHull object for point_set1.
+        hull2 (scipy.spatial.ConvexHull): Pre-computed ConvexHull object for point_set2.
     
     Returns:
         float: The Hausdorff distance between the two point sets.
     """
-    if hull1 is None:
-        hull1 = ConvexHull(point_set1)
-    if hull2 is None:
-        hull2 = ConvexHull(point_set2)
-    
-    closest_points_set1 = point_set2[hull2.closest_point(point_set1)]
-    closest_points_set2 = point_set1[hull1.closest_point(point_set2)]
-    
-    distances1 = np.linalg.norm(point_set1 - closest_points_set1, axis=1)
-    distances2 = np.linalg.norm(point_set2 - closest_points_set2, axis=1)
-    
-    max_distance = np.max(np.concatenate((distances1, distances2)))
-    
-    return max_distance
+    distance1 = directed_hausdorff(point_set1, point_set2[hull2.vertices])[0]
+    distance2 = directed_hausdorff(point_set2, point_set1[hull1.vertices])[0]
+
+    return max(distance1, distance2)
 
 
+def import_and_prepare_point_clouds(path_pc_1, path_pc_2):
+    """
+    Imports and prepares two point clouds for comparison.
+
+    Args:
+        path_pc_1 (str): Path to the first point cloud file.
+        path_pc_2 (str): Path to the second point cloud file.
+
+    Returns:
+        tuple: A tuple containing two arrays of cropped points from the input point clouds.
+    """
+    class_indices = list(classes.CLASS_DESCRIPTIONS.keys())
+
+    pc_1 = laspy.read(path_pc_1)
+    pc_2 = laspy.read(path_pc_2)
+
+    # borders pc 1
+    header_1 = pc_1.header
+    min_borders_1 = header_1.min
+    max_borders_1 = header_1.max
+    
+    # points pc 1
+    points_1 = pc_1.points
+    labels_1 = points_1['classification']
+    filter_indices_1 = np.isin(labels_1, class_indices)
+    filtered_points_1 = points_1[filter_indices_1]
+
+    # borders pc 2
+    header_2 = pc_2.header
+    min_borders_2 = header_2.min
+    max_borders_2 = header_2.max
+
+    # points pc 2
+    points_2 = pc_2.points
+    labels_2 = points_2['classification']
+    filter_indices_2 = np.isin(labels_2, class_indices)
+    filtered_points_2 = points_2[filter_indices_2]
+
+    # bounding box & rectangular crop
+    padding = 1.0
+    min_xyz = np.maximum(min_borders_1, min_borders_2) 
+    max_xyz = np.minimum(max_borders_1, max_borders_2)
+    bounding_box = np.add(np.concatenate((min_xyz, max_xyz)), [-padding, -padding, -padding, padding, padding, padding])
+    cropped_points_1 = crop_points(filtered_points_1, bounding_box)
+    cropped_points_2 = crop_points(filtered_points_2, bounding_box)
+
+    return cropped_points_1, cropped_points_2
