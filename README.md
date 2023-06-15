@@ -10,4 +10,10 @@ This suite is only developped/tested on Windows
 - Visual Studio Code
 
 ## How to use
-Clone the repository, then open & build as a devcontainer in VSCode. Use the jupyter notebook for manipulations/comparisons/... of your labelled .las point clouds.
+Clone the repository and change your docker mount in the devcontainer.json file. Then build as a devcontainer in VSCode. Use the jupyter notebook for manipulations and plotting of your labelled .las point clouds. \
+Currently, operations like ConvexHull and Haussdorff Metric computation are too intensive to be performed in the notebook. To run a dedicated script, open a terminal and run
+```bash
+cd src
+python3 test_hull_script.py
+```
+Depending on your point cloud siz, this can take a long time. Note that you need to adapt input and file saving paths in the script manually beforehand.
