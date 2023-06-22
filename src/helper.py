@@ -39,6 +39,39 @@ def plot_bev(points):
     plt.axis('equal')
     plt.show()
 
+def plot_bev_synth(points, class_list):
+    """
+    Plot a Bird's Eye View (BEV) of a point cloud with colorization based on semantic labels.
+    Parameters:
+        - points (dict): Dictionary containing the point cloud data points, including 'x', 'y', and 'classification'.
+        - class_descriptions (dict): Dictionary mapping class labels to their descriptions.
+    Returns:
+        None (displays the plot)
+    """
+    x = points['x']
+    y = points['y']
+    labels = points.semantic_tags
+
+    # Plot every 100th point with colorization
+    stride = 100
+    x_sampled = x[::stride]
+    y_sampled = y[::stride]
+    labels_sampled = labels[::stride]
+
+    # Create a scatter plot in bird's eye view with colorization
+    plt.figure(figsize=(8, 8))
+    scatter = plt.scatter(x_sampled, y_sampled, c=labels_sampled, cmap='Set1', s=0.1)
+
+    # Add a legend for the semantic labels
+    legend_colors = scatter.legend_elements(prop='colors')[0]
+    plt.legend(legend_colors, list(class_list.values()), loc='upper right', title='Classes')
+
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Filtered Point Cloud (Bird\'s Eye View)')
+    plt.axis('equal')
+    plt.show()
+
 
 def crop_points(points, bounding_box):
     """
