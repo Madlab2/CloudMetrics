@@ -72,6 +72,58 @@ def plot_bev_synth(points, class_list):
     plt.axis('equal')
     plt.show()
 
+def print_dims(pc):
+    header = pc.header
+    offsets = [header.x_offset, header.y_offset, header.z_offset]
+    min_borders = header.min
+    max_borders = header.max
+
+    print("Point Cloud Min, Max, Offset:")
+    print(min_borders)
+    print(max_borders)
+    print(offsets)
+    return
+
+def apply_offset(point_cloud, x_offset, y_offset, z_offset):
+
+    # copy point cloud (do not change original)
+    point_cloud_shifted = point_cloud
+    # update header info (essential for not getting overflow errors)
+    header_shifted = point_cloud_shifted.header
+    new_offset = np.array([x_offset, y_offset, z_offset])
+    old_offset = np.array(header_shifted.offset)
+    global_shift = old_offset + new_offset
+    header_shifted.offset = global_shift.tolist()
+    header_shifted.min += new_offset
+    header_shifted.max += new_offset
+    point_cloud_shifted.header = header_shifted
+
+    # Access the x, y, and z coordinates of the points
+    points = np.vstack((point_cloud_shifted.x, point_cloud_shifted.y, point_cloud_shifted.z)).T
+
+    # Apply the offset
+    offset = np.array([x_offset, y_offset, z_offset])
+    points += offset
+
+    point_cloud_shifted.x = points[:, 0]
+    point_cloud_shifted.y = points[:, 1]
+    point_cloud_shifted.z = points[:, 2]
+
+    return point_cloud_shifted
+
+def apply_y_flip(point_cloud):
+    
+    # copy point cloud (do not change original)
+    point_cloud_flipped = point_cloud
+    # update header info
+    header_flipped = point_cloud_flipped.header
+    header_flipped.min[1] = -header_flipped.min[1]
+    header_flipped.max[1] = -header_flipped.max[1]
+    point_cloud_flipped.header = header_flipped
+    y_points = np.array(point_cloud_flipped.points.y)
+    # flip y
+    point_cloud_flipped.points.y = -y_points
+    return point_cloud_flipped
 
 def crop_points(points, bounding_box):
     """
