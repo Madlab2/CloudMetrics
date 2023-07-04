@@ -1,0 +1,4 @@
+#!/usr/bin/env python
+X_OFFSET_REAL = -674000
+Y_OFFSET_REAL = -5405000
+Z_OFFSET_REAL = 0

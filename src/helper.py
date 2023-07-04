@@ -3,21 +3,27 @@ import numpy as np
 import laspy
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
-import classes
+import classes, offsets
 
 
-def plot_bev(points):
+def plot_bev(points, type=None):
     """
     Plot a Bird's Eye View (BEV) of a point cloud with colorization based on semantic labels.
     Parameters:
         - points (dict): Dictionary containing the point cloud data points, including 'x', 'y', and 'classification'.
-        - class_descriptions (dict): Dictionary mapping class labels to their descriptions.
+        - type (str): 'real' or 'synth' . Used for class desccriptions and semantic tag retrieval
     Returns:
         None (displays the plot)
     """
     x = points['x']
     y = points['y']
-    labels = points['classification']
+    if type == 'real':
+        labels = points['classification']
+    elif type == 'synth':
+        labels = points.semantic_tags
+    else: 
+        # quit
+        return
 
     # Plot every 100th point with colorization
     stride = 100
@@ -31,46 +37,20 @@ def plot_bev(points):
 
     # Add a legend for the semantic labels
     legend_colors = scatter.legend_elements(prop='colors')[0]
-    plt.legend(legend_colors, list(classes.CLASS_DESCRIPTIONS.values()), loc='upper right', title='Classes')
+
+    if type == 'real':
+        class_description_value_list = list(classes.CLASS_DESCRIPTIONS_REAL.values())
+    else:
+        class_description_value_list = list(classes.CLASS_DESCRIPTIONS_SYNTH.values())
+    
+    plt.legend(legend_colors, class_description_value_list, loc='upper right', title='Classes')
 
     plt.xlabel('X')
     plt.ylabel('Y')
-    plt.title('Filtered Point Cloud (Bird\'s Eye View)')
+    plt.title('Point Cloud (Bird\'s Eye View)')
     plt.axis('equal')
     plt.show()
 
-def plot_bev_synth(points, class_list):
-    """
-    Plot a Bird's Eye View (BEV) of a point cloud with colorization based on semantic labels.
-    Parameters:
-        - points (dict): Dictionary containing the point cloud data points, including 'x', 'y', and 'classification'.
-        - class_descriptions (dict): Dictionary mapping class labels to their descriptions.
-    Returns:
-        None (displays the plot)
-    """
-    x = points['x']
-    y = points['y']
-    labels = points.semantic_tags
-
-    # Plot every 100th point with colorization
-    stride = 100
-    x_sampled = x[::stride]
-    y_sampled = y[::stride]
-    labels_sampled = labels[::stride]
-
-    # Create a scatter plot in bird's eye view with colorization
-    plt.figure(figsize=(8, 8))
-    scatter = plt.scatter(x_sampled, y_sampled, c=labels_sampled, cmap='Set1', s=0.1)
-
-    # Add a legend for the semantic labels
-    legend_colors = scatter.legend_elements(prop='colors')[0]
-    plt.legend(legend_colors, list(class_list.values()), loc='upper right', title='Classes')
-
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Filtered Point Cloud (Bird\'s Eye View)')
-    plt.axis('equal')
-    plt.show()
 
 def print_dims(pc):
     header = pc.header
@@ -120,9 +100,9 @@ def apply_y_flip(point_cloud):
     header_flipped.min[1] = -header_flipped.min[1]
     header_flipped.max[1] = -header_flipped.max[1]
     point_cloud_flipped.header = header_flipped
-    y_points = np.array(point_cloud_flipped.points.y)
+    y_points = np.array(point_cloud_flipped.y)
     # flip y
-    point_cloud_flipped.points.y = -y_points
+    point_cloud_flipped.y = -y_points
     return point_cloud_flipped
 
 def crop_points(points, bounding_box):
@@ -142,12 +122,12 @@ def crop_points(points, bounding_box):
         - Header Information of the point cloud is not updated (e.g. min and max values)
     """
     # Extract x, y, z coordinates from points
-    x = points.x
-    y = points.y
-    z = points.z
+    x = np.abs(points.x)
+    y = np.abs(points.y)
+    z = np.abs(points.z)
 
     # bounding box coordinates
-    min_x, min_y, min_z, max_x, max_y, max_z = bounding_box
+    min_x, min_y, min_z, max_x, max_y, max_z = np.abs(bounding_box)
 
     # Select the points within the bounding box
     mask = ((x >= min_x) & (x <= max_x) &
@@ -157,50 +137,58 @@ def crop_points(points, bounding_box):
     return points[mask]
 
 
-def import_and_prepare_point_clouds(path_pc_1, path_pc_2):
+def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True, flip_synth=True):
     """
     Imports and prepares two point clouds for comparison.
 
     Args:
-        path_pc_1 (str): Path to the first point cloud file.
-        path_pc_2 (str): Path to the second point cloud file.
+        path_pc_real (str): Path to the real point cloud file.
+        path_pc_synth (str): Path to the synthetic point cloud file.
+        shift_real (bool): flag indicating whether to shift real point cloud by OFFSETS defined in offsets.py
+        flipy_synth (bool): flag indicating whether to flip synthetic point cloud along y axis
 
     Returns:
         tuple: A tuple containing two arrays of cropped points from the input point clouds.
     """
-    class_indices = list(classes.CLASS_DESCRIPTIONS.keys())
+    class_indices_real = list(classes.CLASS_DESCRIPTIONS_REAL.keys())
+    class_indices_synth = list(classes.CLASS_DESCRIPTIONS_SYNTH.keys())
+    pc_real = laspy.read(path_pc_real)
+    pc_synth = laspy.read(path_pc_synth)
 
-    pc_1 = laspy.read(path_pc_1)
-    pc_2 = laspy.read(path_pc_2)
-
-    # borders pc 1
-    header_1 = pc_1.header
-    min_borders_1 = header_1.min
-    max_borders_1 = header_1.max
+    # ensure that both pc are in same reference frame
+    if shift_real == True:
+        pc_real = apply_offset(pc_real, offsets.X_OFFSET_REAL, offsets.Y_OFFSET_REAL, offsets.Z_OFFSET_REAL)
+    if flip_synth == True:
+        pc_synth = apply_y_flip(pc_synth)
     
-    # points pc 1
-    points_1 = pc_1.points
-    labels_1 = points_1['classification']
-    filter_indices_1 = np.isin(labels_1, class_indices)
-    filtered_points_1 = points_1[filter_indices_1]
+    # borders real pc
+    header_real = pc_real.header
+    min_borders_real = header_real.min
+    max_borders_real = header_real.max
+    
+    # points real pc
+    points_real = pc_real.points
+    labels_real = points_real['classification']
+    filter_indices_real = np.isin(labels_real, class_indices_real)
+    filtered_points_real = points_real[filter_indices_real]
 
-    # borders pc 2
-    header_2 = pc_2.header
-    min_borders_2 = header_2.min
-    max_borders_2 = header_2.max
+    # borders synth pc
+    header_synth = pc_synth.header
+    min_borders_synth = header_synth.min
+    max_borders_synth = header_synth.max
 
-    # points pc 2
-    points_2 = pc_2.points
-    labels_2 = points_2['classification']
-    filter_indices_2 = np.isin(labels_2, class_indices)
-    filtered_points_2 = points_2[filter_indices_2]
+    # points synth pc
+    points_synth = pc_synth.points
+    labels_synth = points_synth.semantic_tags
+    filter_indices_synth = np.isin(labels_synth, class_indices_synth)
+    filtered_points_synth = points_synth[filter_indices_synth]
 
     # bounding box & rectangular crop
     padding = 1.0
-    min_xyz = np.maximum(min_borders_1, min_borders_2) 
-    max_xyz = np.minimum(max_borders_1, max_borders_2)
+    min_xyz = np.maximum(min_borders_real, min_borders_synth) 
+    max_xyz = np.minimum(max_borders_real, max_borders_synth)
     bounding_box = np.add(np.concatenate((min_xyz, max_xyz)), [-padding, -padding, -padding, padding, padding, padding])
-    cropped_points_1 = crop_points(filtered_points_1, bounding_box)
-    cropped_points_2 = crop_points(filtered_points_2, bounding_box)
+    cropped_points_real = crop_points(filtered_points_real, bounding_box)
+    cropped_points_synth = crop_points(filtered_points_synth, bounding_box)
 
-    return cropped_points_1, cropped_points_2
+    return cropped_points_real, cropped_points_synth
