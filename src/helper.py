@@ -137,7 +137,7 @@ def crop_points(points, bounding_box):
     return points[mask]
 
 
-def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True, flip_synth=True):
+def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True, flip_synth=True, crop=False):
     """
     Imports and prepares two point clouds for comparison.
 
@@ -161,27 +161,29 @@ def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True
     if flip_synth == True:
         pc_synth = apply_y_flip(pc_synth)
     
-    # borders real pc
-    header_real = pc_real.header
-    min_borders_real = header_real.min
-    max_borders_real = header_real.max
-    
-    # points real pc
+
+    # filter classes
     points_real = pc_real.points
     labels_real = points_real['classification']
     filter_indices_real = np.isin(labels_real, class_indices_real)
     filtered_points_real = points_real[filter_indices_real]
-
-    # borders synth pc
-    header_synth = pc_synth.header
-    min_borders_synth = header_synth.min
-    max_borders_synth = header_synth.max
-
-    # points synth pc
+    
     points_synth = pc_synth.points
     labels_synth = points_synth.semantic_tags
     filter_indices_synth = np.isin(labels_synth, class_indices_synth)
     filtered_points_synth = points_synth[filter_indices_synth]
+
+    if crop == False:
+        return filtered_points_real, filtered_points_synth
+    
+    # continue with cropping
+    header_real = pc_real.header
+    min_borders_real = header_real.min
+    max_borders_real = header_real.max
+    
+    header_synth = pc_synth.header
+    min_borders_synth = header_synth.min
+    max_borders_synth = header_synth.max
 
     # bounding box & rectangular crop
     padding = 1.0

@@ -19,4 +19,4 @@ RUN pip install --upgrade --no-cache-dir ipympl \
   tqdm \
   open3d \
   laspy \
-  pyntcloud
+  py4dgeo

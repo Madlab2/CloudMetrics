@@ -19,20 +19,20 @@ def laspy_to_np_array(laspy_points):
 def build_kdtree(points):
     return cKDTree(points)
 
-def hausdorff_distance_with_tree(path_pc_1, path_pc_2, path_hull_1=None, path_hull_2=None):
+def hausdorff_distance_with_tree(path_pc_real, path_pc_synth, path_hull_real=None, path_hull_synth=None):
     """
     Calculates the Hausdorff distance between two point clouds using their convex hulls and spatial data structures.
 
     Args:
-        path_pc_1 (str): Path to the first point cloud las file.
-        path_pc_2 (str): Path to the second point cloud las file.
-        path_hull_1 (str, optional): Path to the file containing the convex hull of the first point cloud (precomputed).
-        path_hull_2 (str, optional): Path to the file containing the convex hull of the second point cloud (precomputed).
+        path_pc_real (str): Path to the real point cloud las file.
+        path_pc_synth (str): Path to the synth point cloud las file.
+        path_hull_real (str, optional): Path to the file containing the convex hull of the first point cloud (precomputed).
+        path_hull_synth (str, optional): Path to the file containing the convex hull of the second point cloud (precomputed).
 
     Returns:
         float: The Hausdorff distance between the two point clouds.
     """
-    cropped_points_1, cropped_points_2 = helper.import_and_prepare_point_clouds(path_pc_1, path_pc_2)
+    cropped_points_1, cropped_points_2 = helper.import_and_prepare_point_clouds(path_pc_real, path_pc_synth)
     
     # extract purely the coordinates of the points
     cropped_xyz_1 = cropped_points_1[['x', 'y', 'z']]
@@ -51,11 +51,11 @@ def hausdorff_distance_with_tree(path_pc_1, path_pc_2, path_hull_1=None, path_hu
     
     
     # Different computation depending on whether convex hulls for point clouds exist or not
-    if path_hull_1 is not None and path_hull_2 is not None:
+    if path_hull_real is not None and path_hull_synth is not None:
         print("Loading hulls...")
-        with open(path_hull_1, "rb") as file:
+        with open(path_hull_real, "rb") as file:
             hull_1 = pickle.load(file)
-        with open(path_hull_2, "rb") as file:
+        with open(path_hull_synth, "rb") as file:
             hull_2 = pickle.load(file)
 
         print("Computing distance 1 from hulls...")
@@ -106,12 +106,12 @@ if __name__ == "__main__":
         print("Wrong number of inputs")
         sys.exit()
     if len(sys.argv) == 1:
-        path_pc_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
-        path_pc_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
-        path_hull_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
-        path_hull_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
-        #path_hull_1 = None
-        #path_hull_2 = None
+        path_pc_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/Train1 - labelled.las'
+        path_pc_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/Val_1 - Cloud.las'
+        #path_hull_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
+        #path_hull_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
+        path_hull_1 = None
+        path_hull_2 = None
     elif len(sys.argv) == 3:
         path_pc_1 = sys.argv[1]
         path_pc_2 = sys.argv[2]
@@ -123,6 +123,6 @@ if __name__ == "__main__":
         path_hull_1 = sys.argv[3]
         path_hull_2 = sys.argv[4]
     
-    d_haussd = hausdorff_distance_with_tree(path_pc_1=path_pc_1, path_pc_2=path_pc_2,
-                    path_hull_1=path_hull_1, path_hull_2=path_hull_2)
+    d_haussd = hausdorff_distance_with_tree(path_pc_real=path_pc_1, path_pc_synth=path_pc_2,
+                    path_hull_real=path_hull_1, path_hull_synth=path_hull_2)
     print(d_haussd)
