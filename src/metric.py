@@ -27,6 +27,8 @@ CLASS_NUM_TO_WEIGHT = {
     6: 0.15,    # Building Installation
 }
 
+METRIC_WEIGHTS = np.array([0.66, 0.33]) # M3C2, C2C
+
 def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     global OUTPUT
 
@@ -77,9 +79,15 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     # calculate cloud to cloud distance
     logging.info("Computing Cloud-to-Cloud Distance")
     c2c_median_distance, c2c_mean_dist, c2c_stdev = cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes)
-    logging.info(f"\tC2C Median Distance = {c2c_median_distance}")
     OUTPUT += f"\nCloud2Cloud Results:\nMedian Distance = {c2c_median_distance} \nMean Distance = {c2c_mean_dist} \nStandard Deviation = {c2c_stdev}\n"
-    return mean_m3C2
+    
+    metrics_vector = np.array([mean_m3C2, c2c_mean_dist])
+    weight_vector = METRIC_WEIGHTS/np.sum(METRIC_WEIGHTS) # normalize weights
+    distance_metric = (weight_vector.T).dot(metrics_vector)
+
+    OUTPUT += f"\nFinal Cloud Comparison Metric = {distance_metric}"
+
+    return distance_metric
 
 def cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes):
     logging.info("\tC2C: Creating Open3D Point Clouds")
