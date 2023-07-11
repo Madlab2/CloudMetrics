@@ -1,22 +1,21 @@
 #!/usr/bin/env python
 import logging
 import numpy as np
-import py4dgeo
-import pickle
+import py4dgeo, open3d
 from tqdm import tqdm
-import contextlib
 import os, sys
 import helper, classes
 
 logging.basicConfig(level=logging.INFO)
 
-output_file_path = "../results/metrics_results.txt"  # Replace with the desired file path
+output_file_path = "../results/metrics_results.txt"
 OUTPUT = "Metrics Results\n"
 
 EVERY_NTH = 10000
 MIN_POINTS = 20
 NAN_THRESHOLD = 0.9
 MIN_NUM_DISTANCES = 50
+SPARSING_C2C = 10
 
 CLASS_NUM_TO_WEIGHT = {
     0: 0.1,     # Road
@@ -74,12 +73,37 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
             mean_m3C2 += weights[weight_idx] * np.abs(median_distance)
             weight_idx += 1
     OUTPUT += f"\nWeightedMeanM3C2 = {mean_m3C2}\n"
+
+    # calculate cloud to cloud distance
+    logging.info("Computing Cloud-to-Cloud Distance")
+    c2c_median_distance, c2c_mean_dist, c2c_stdev = cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes)
+    logging.info(f"\tC2C Median Distance = {c2c_median_distance}")
+    OUTPUT += f"\nCloud2Cloud Results:\nMedian Distance = {c2c_median_distance} \nMean Distance = {c2c_mean_dist} \nStandard Deviation = {c2c_stdev}\n"
     return mean_m3C2
 
-def laspy_to_np_array(laspy_points):
-    x = laspy_points['x']
-    y = laspy_points['y']
-    z = laspy_points['z']
+def cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes):
+    logging.info("\tC2C: Creating Open3D Point Clouds")
+    real_points_np = laspy_to_np_array(real_points_all_classes, sparsing_factor=SPARSING_C2C)
+    synth_points_np = laspy_to_np_array(synth_points_all_classes, sparsing_factor=SPARSING_C2C)
+
+    real_cloud_o3d = open3d.geometry.PointCloud()
+    real_cloud_o3d.points = open3d.utility.Vector3dVector(real_points_np)
+    synth_cloud_o3d = open3d.geometry.PointCloud()
+    synth_cloud_o3d.points = open3d.utility.Vector3dVector(synth_points_np)
+
+    reference_pc = real_cloud_o3d
+    target_pc = synth_cloud_o3d
+    logging.info("\tC2C: Calculating Cloud-to-Cloud Distnace")
+    distances = reference_pc.compute_point_cloud_distance(target_pc)
+    median_distance = np.nanmedian(distances)
+    mean_dist = np.nanmean(distances)
+    stdev = np.nanstd(distances)
+    return median_distance, mean_dist, stdev
+
+def laspy_to_np_array(laspy_points, sparsing_factor=1):
+    x = laspy_points['x'][::sparsing_factor]
+    y = laspy_points['y'][::sparsing_factor]
+    z = laspy_points['z'][::sparsing_factor]
     return np.column_stack((x, y, z))
 
 def class_split_pc(points_all_classes, type=None):
