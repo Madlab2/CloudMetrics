@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 output_file_path = "../results/metrics_results.txt"
 OUTPUT = "Metrics Results\n"
 
-EVERY_NTH = 10000
+EVERY_NTH = 1000
 MIN_POINTS = 20
 NAN_THRESHOLD = 0.9
 MIN_NUM_DISTANCES = 50

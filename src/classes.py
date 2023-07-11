@@ -17,7 +17,7 @@ CLASS_DESCRIPTIONS_SYNTH = {
     #9: 'Vegetation',
     14: 'Car',
     25: 'Ground',
-    29: 'Building Installations',
+    0: 'Building Installations',    # was 29
     31: 'Window',
     33: 'Door',
     37: 'Roof',
@@ -44,5 +44,5 @@ CLASSES_FOR_M3C2_SYNTH = {
     37: 'Roof',                     # 4
     33: 'Door',                     # 5
     31: 'Window',                   # 6
-    29: 'Building Installations'    # 7
+    0: 'Building Installations'     # 7 (was 29)
 }
