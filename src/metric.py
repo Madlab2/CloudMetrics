@@ -15,7 +15,7 @@ EVERY_NTH = 10000
 MIN_POINTS = 20
 NAN_THRESHOLD = 0.9
 MIN_NUM_DISTANCES = 50
-SPARSING_C2C = 10
+SPARSING_C2C = 1
 
 CLASS_NUM_TO_WEIGHT = {
     0: 0.1,     # Road
@@ -36,16 +36,16 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, shift_real=True, flip_synth=True, crop=True)
     
     logging.info("Computing Class-Wise M3C2 Distances")
-    class_wise_distances_medians, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes = m3c2_class_wise(real_points_all_classes, synth_points_all_classes)
+    class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes = m3c2_class_wise(real_points_all_classes, synth_points_all_classes)
     
     classes_to_ignore = []
     OUTPUT += "\nM3C2 Medians for each class:\n"
-    for class_number, median_distance in class_wise_distances_medians:
+    for class_number, median_distance, mean_distance, stdev in class_wise_distances_results:
         class_idx = list(classes.CLASSES_FOR_M3C2_REAL.keys())[class_number]
         class_name = classes.CLASSES_FOR_M3C2_REAL[class_idx]
         num_distances = len(class_wise_distances_all[class_number])
         nan_ratio = np.sum(np.isnan(class_wise_distances_all[class_number]))/num_distances
-        OUTPUT += f"\tClass {class_name} ({class_number}):\tMedian distance = {median_distance},\t#distances: {num_distances},\tNan-Ratio: {nan_ratio}\n"
+        OUTPUT += f"\n\tClass {class_name} ({class_number}):\n\t\tMedian distance = {median_distance},\n\t\tMean distance = {mean_distance},\n\t\tStandard Deviation = {stdev},\n\t\t#distances: {num_distances},\n\t\tNan-Ratio: {nan_ratio}\n"
         if np.isnan(median_distance) or nan_ratio > NAN_THRESHOLD or num_distances < MIN_NUM_DISTANCES:
             classes_to_ignore.append(class_number)
     
@@ -69,7 +69,7 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     mean_m3C2 = 0.0
     weight_idx = 0
 
-    for class_number, median_distance in class_wise_distances_medians:
+    for class_number, median_distance, _, _ in class_wise_distances_results:
         if class_number not in classes_to_ignore:
             #logging.debug(f"\tAdding to Mean: Class Number {class_number}, Weight {weights[weight_idx]}, Median {median_distance}")
             mean_m3C2 += weights[weight_idx] * np.abs(median_distance)
@@ -79,7 +79,7 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     # calculate cloud to cloud distance
     logging.info("Computing Cloud-to-Cloud Distance")
     c2c_median_distance, c2c_mean_dist, c2c_stdev = cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes)
-    OUTPUT += f"\nCloud2Cloud Results:\nMedian Distance = {c2c_median_distance} \nMean Distance = {c2c_mean_dist} \nStandard Deviation = {c2c_stdev}\n"
+    OUTPUT += f"\nCloud2Cloud Results:\n\tMedian Distance = {c2c_median_distance} \n\tMean Distance = {c2c_mean_dist} \n\tStandard Deviation = {c2c_stdev}\n"
     
     metrics_vector = np.array([mean_m3C2, c2c_mean_dist])
     weight_vector = METRIC_WEIGHTS/np.sum(METRIC_WEIGHTS) # normalize weights
@@ -144,7 +144,7 @@ def m3c2_class_wise(real_points_all_classes, synth_points_all_classes):
     assert(len(real_points_class_wise) == len(synth_points_class_wise))
     
     class_wise_distances_all = []
-    class_wise_distances_medians = []
+    class_wise_distances_results = []
     class_wise_uncertainties_all = []
     skipped_classes = []
 
@@ -178,14 +178,16 @@ def m3c2_class_wise(real_points_all_classes, synth_points_all_classes):
             uncertainties = np.array(uncertainties)
             # we have nan values, thus special median calculation
             median_distance = np.nanmedian(distances)
+            mean_distance = np.nanmean(distances)
+            stdev = np.nanstd(distances)
             #median_uncertainty = np.median(uncertainties["lodetection"])
 
             class_wise_distances_all.append(distances)
-            class_wise_distances_medians.append([class_number, median_distance])
+            class_wise_distances_results.append([class_number, median_distance, mean_distance, stdev])
             class_wise_uncertainties_all.append(uncertainties)
             
 
-    return class_wise_distances_medians, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes
+    return class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes
 
 if __name__ == "__main__":
     if len(sys.argv) not in [1, 3]:
