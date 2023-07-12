@@ -17,6 +17,7 @@ NAN_THRESHOLD = 0.9
 MIN_NUM_DISTANCES = 50
 SPARSING_C2C = 1
 
+
 CLASS_NUM_TO_WEIGHT = {
     0: 0.1,     # Road
     1: 0.1,     # Ground
@@ -27,7 +28,23 @@ CLASS_NUM_TO_WEIGHT = {
     6: 0.15,    # Building Installation
 }
 
-METRIC_WEIGHTS = np.array([0.66, 0.33]) # M3C2, C2C
+DISTANCE_WEIGHTS = np.array([0.6, 0.4]) # M3C2, C2C
+METRIC_WEIGHTS = np.array([0.6, 0.2, 0.2]) # M3C2, C2C, MIoU
+
+SLOPE_FACTOR = -0.2
+
+def iou_eval_function(mean_iou):
+    #return (1 - mean_iou) * np.exp(1-2*mean_iou)
+    epsilon = 0.00001
+    return (1/(mean_iou + epsilon))
+
+def metric_eval_function(mean_m3C2, c2c_mean_dist, m_iou_factor):
+    # returns something between 0 and 1
+    metrics_vec = np.abs(np.array([mean_m3C2, c2c_mean_dist, m_iou_factor]))
+    weight_vec = METRIC_WEIGHTS.T
+    scalar_prod = weight_vec.dot(metrics_vec)
+    metric = 1 - np.exp(SLOPE_FACTOR * scalar_prod)
+    return metric
 
 def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     global OUTPUT
@@ -35,8 +52,12 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     logging.info('Reading & preparing data')
     real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, shift_real=True, flip_synth=True, crop=True)
     
+    logging.info('Splitting data')
+    real_points_class_wise = class_split_pc(real_points_all_classes, type='real')
+    synth_points_class_wise = class_split_pc(synth_points_all_classes, type='synth')
+
     logging.info("Computing Class-Wise M3C2 Distances")
-    class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes = m3c2_class_wise(real_points_all_classes, synth_points_all_classes)
+    class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes = m3c2_class_wise(real_points_class_wise, synth_points_class_wise)
     
     classes_to_ignore = []
     OUTPUT += "\nM3C2 Medians for each class:\n"
@@ -68,7 +89,6 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
 
     mean_m3C2 = 0.0
     weight_idx = 0
-
     for class_number, median_distance, _, _ in class_wise_distances_results:
         if class_number not in classes_to_ignore:
             #logging.debug(f"\tAdding to Mean: Class Number {class_number}, Weight {weights[weight_idx]}, Median {median_distance}")
@@ -76,18 +96,38 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
             weight_idx += 1
     OUTPUT += f"\nWeightedMeanM3C2 = {mean_m3C2}\n"
 
-    # calculate cloud to cloud distance
-    logging.info("Computing Cloud-to-Cloud Distance")
-    c2c_median_distance, c2c_mean_dist, c2c_stdev = cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes)
-    OUTPUT += f"\nCloud2Cloud Results:\n\tMedian Distance = {c2c_median_distance} \n\tMean Distance = {c2c_mean_dist} \n\tStandard Deviation = {c2c_stdev}\n"
+    # calculate cloud to cloud distances
+    logging.info("Computing Cloud-to-Cloud Distance forward")
+    c2c_median_distance_fwd, c2c_mean_dist_fwd, c2c_stdev_fwd = cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes)
+    OUTPUT += f"\nCloud2Cloud Results Forward:\n\tMedian Distance = {c2c_median_distance_fwd} \n\tMean Distance = {c2c_mean_dist_fwd} \n\tStandard Deviation = {c2c_stdev_fwd}\n"
+    logging.info("Computing Cloud-to-Cloud Distance backward")
+    c2c_median_distance_bkwd, c2c_mean_dist_bkwd, c2c_stdev_bkwd = cloud_to_cloud_distance(synth_points_all_classes, real_points_all_classes)
+    OUTPUT += f"\nCloud2Cloud Results Backward:\n\tMedian Distance = {c2c_median_distance_bkwd} \n\tMean Distance = {c2c_mean_dist_bkwd} \n\tStandard Deviation = {c2c_stdev_bkwd}\n"
     
-    metrics_vector = np.array([mean_m3C2, c2c_mean_dist])
-    weight_vector = METRIC_WEIGHTS/np.sum(METRIC_WEIGHTS) # normalize weights
-    distance_metric = (weight_vector.T).dot(metrics_vector)
+    c2c_mean_dist = np.mean([c2c_mean_dist_fwd, c2c_mean_dist_bkwd])
+    OUTPUT += f"Cloud2Cloud mean distance = {c2c_mean_dist}\n"
+    # Interesection over Union
+    logging.info("Computing MeanIoU")
+    weighted_mean_iou, _ = class_wise_iou(real_points_class_wise, synth_points_class_wise)
+    m_iou_factor = iou_eval_function(weighted_mean_iou)
+    OUTPUT += f"Weighted MeanIoU = {round(100 * weighted_mean_iou, 4)} %\nMeanIoU Factor = {m_iou_factor}\n"
 
-    OUTPUT += f"\nFinal Cloud Comparison Metric = {distance_metric}"
+    logging.info(f"Calculating Metric")
+    metric = metric_eval_function(mean_m3C2, c2c_mean_dist, m_iou_factor)
 
-    return distance_metric
+    logging.info(f"Calculating Distance")
+    distance_vector = np.array([mean_m3C2, c2c_mean_dist])
+    distance_weights = DISTANCE_WEIGHTS.T
+    distance = distance_weights.dot(distance_vector)
+
+    OUTPUT += "\n-----------------------------\nSummary:"
+    OUTPUT += f"\nFinal Cloud Comparison Metric = {metric}"
+    OUTPUT += f"\nWeighed Cloud Distance (M3C2 and C2C) = {distance}\n\n"
+    OUTPUT += f"WeightedMeanM3C2 = {mean_m3C2}\n"
+    OUTPUT += f"Cloud2Cloud mean distance = {c2c_mean_dist}\n"
+    OUTPUT += f"Weighted MeanIoU = {round(100 * weighted_mean_iou, 4)}%"
+
+    return metric, distance
 
 def cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes):
     logging.info("\tC2C: Creating Open3D Point Clouds")
@@ -101,12 +141,35 @@ def cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes):
 
     reference_pc = real_cloud_o3d
     target_pc = synth_cloud_o3d
-    logging.info("\tC2C: Calculating Cloud-to-Cloud Distnace")
+    logging.info("\tC2C: Calculating Cloud-to-Cloud Distance")
     distances = reference_pc.compute_point_cloud_distance(target_pc)
     median_distance = np.nanmedian(distances)
     mean_dist = np.nanmean(distances)
     stdev = np.nanstd(distances)
     return median_distance, mean_dist, stdev
+
+def class_wise_iou(real_points_class_wise, synth_points_class_wise):
+    global OUTPUT
+    idx = 0
+    class_wise_iou = []
+    logging.info("\tIoU: Calculating Class Wise IoU")
+    OUTPUT += "\nIntersection over Union (IoU) for each class:"
+    for class_points_real, class_points_synth in tqdm(zip(real_points_class_wise, synth_points_class_wise), bar_format='\t\t{l_bar}{bar}'):
+        intersection_count = len(np.intersect1d(class_points_real, class_points_synth))
+        union_count = len(np.union1d(class_points_real, class_points_synth))
+        iou = intersection_count / union_count
+        class_wise_iou.append(iou)
+
+        class_number = list(classes.CLASSES_FOR_M3C2_REAL.keys())[idx]
+        class_name = classes.CLASSES_FOR_M3C2_REAL[class_number]
+        OUTPUT += f"\n\tClass {class_name} ({class_number}):\t IoU = {round(100 * iou, 2)} %"
+        idx += 1
+
+    weights = np.array(list(CLASS_NUM_TO_WEIGHT.values())).T
+    weighted_mean_iou = weights.dot(class_wise_iou)
+
+    return weighted_mean_iou, class_wise_iou
+
 
 def laspy_to_np_array(laspy_points, sparsing_factor=1):
     x = laspy_points['x'][::sparsing_factor]
@@ -135,11 +198,8 @@ def class_split_pc(points_all_classes, type=None):
 
 
 
-def m3c2_class_wise(real_points_all_classes, synth_points_all_classes):    
-    logging.info('\tM3C2 Splitting data')
-    real_points_class_wise = class_split_pc(real_points_all_classes, type='real')
-    synth_points_class_wise = class_split_pc(synth_points_all_classes, type='synth')
-
+def m3c2_class_wise(real_points_class_wise, synth_points_class_wise):    
+    
     # ensure number of point clouds/classes is the same for real and synth
     assert(len(real_points_class_wise) == len(synth_points_class_wise))
     
@@ -148,12 +208,12 @@ def m3c2_class_wise(real_points_all_classes, synth_points_all_classes):
     class_wise_uncertainties_all = []
     skipped_classes = []
 
-    logging.info('\tM3C2 Calculating distances...')
+    logging.info('\tM3C2: Calculating distances...')
     for class_number in tqdm(range(len(real_points_class_wise)), bar_format='\t\t{l_bar}{bar}'):
         
         if len(real_points_class_wise[class_number]) < MIN_POINTS or len(synth_points_class_wise[class_number]) < MIN_POINTS:
             # not enough points for meaningful calculation
-            logging.info("M3C2 Class {} has not enough points and is skipped".format(classes.CLASSES_FOR_M3C2_REAL[list(classes.CLASSES_FOR_M3C2_REAL.keys())[class_number]]))
+            logging.info("M3C2: Class {} has not enough points and is skipped".format(classes.CLASSES_FOR_M3C2_REAL[list(classes.CLASSES_FOR_M3C2_REAL.keys())[class_number]]))
             skipped_classes.append(class_number)
         else:
             # m3c2 needs special epoch data type, timestamp is optional 

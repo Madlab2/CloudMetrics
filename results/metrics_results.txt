@@ -59,9 +59,33 @@ M3C2 Skipped classes (too few points):
 
 WeightedMeanM3C2 = 1.2003553795009183
 
-Cloud2Cloud Results:
+Cloud2Cloud Results Forward:
 	Median Distance = 1.5659393837885314 
 	Mean Distance = 2.5519376812522228 
 	Standard Deviation = 3.023617058041672
 
-Final Cloud Comparison Metric = 1.65088281341802
+Cloud2Cloud Results Backward:
+	Median Distance = 2.4593340955233773 
+	Mean Distance = 3.724632809070597 
+	Standard Deviation = 5.250682444483449
+Cloud2Cloud mean distance = 3.13828524516141
+
+Intersection over Union (IoU) for each class:
+
+	Class Road (1):	 IoU = 6.23 %
+	Class Ground (2):	 IoU = 6.34 %
+	Class Wall Surface (6):	 IoU = 10.96 %
+	Class Roof Surface (7):	 IoU = 5.47 %
+	Class Doors (8):	 IoU = 6.63 %
+	Class Windows (9):	 IoU = 9.35 %
+	Class Building Installations (10):	 IoU = 4.99 %Weighted MeanIoU = 7.4153 %
+MeanIoU Factor = 13.483795440415298
+
+-----------------------------
+Summary:
+Final Cloud Comparison Metric = 0.5546638429814222
+Weighed Cloud Distance (M3C2 and C2C) = 1.975527325765115
+
+WeightedMeanM3C2 = 1.2003553795009183
+Cloud2Cloud mean distance = 3.13828524516141
+Weighted MeanIoU = 7.4153%
