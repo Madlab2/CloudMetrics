@@ -189,6 +189,7 @@ def m3c2_class_wise(real_points_all_classes, synth_points_all_classes):
 
     return class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes
 
+
 if __name__ == "__main__":
     if len(sys.argv) not in [1, 3]:
         logging.info("Wrong number of inputs")
