@@ -1,7 +1,8 @@
 import numpy as np
 import laspy
 import classes, helper, metric
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt 
+import matplotlib.ticker as mtick
 
 def cloud_statistic(pc_path_1, pc_path_2=None, name=None):
     output = "Number of Points per relevant Class in Dataset " + str(name) + ":\n"
@@ -34,7 +35,7 @@ def cloud_statistic(pc_path_1, pc_path_2=None, name=None):
 
     for point_count in class_point_counts:
         class_key = keys[idx]
-        output += f"\t#Points in class {classes.CLASSES_FOR_M3C2_REAL[class_key]}:\t{point_count} | Relative share within this dataset: {round(point_count / np.sum(class_point_counts), 2)}%\n"
+        output += f"\t#Points in class {classes.CLASSES_FOR_M3C2_REAL[class_key]}:\t{point_count} | Relative share within this dataset: {round(100 * point_count / np.sum(class_point_counts), 2)}%\n"
         idx += 1
 
     return output, class_point_counts
@@ -83,19 +84,23 @@ def compute_data_distribution(path_train_1, path_train_2, path_valid, path_test)
     width = 0.4
     bar_plot_inputs = dict()
     
-    bar_plot_inputs['Train'] = class_shares_total * relativ_point_counts_train
-    bar_plot_inputs['Validation'] = class_shares_total * relativ_point_counts_valid
-    bar_plot_inputs['Test'] = class_shares_total * relativ_point_counts_test
+    bar_plot_inputs['Train'] = class_shares_total * relativ_point_counts_train / 100
+    bar_plot_inputs['Validation'] = class_shares_total * relativ_point_counts_valid / 100
+    bar_plot_inputs['Test'] = class_shares_total * relativ_point_counts_test / 100
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(9, 12))
     bottom = np.zeros(len(x_names))
     for names, shares in bar_plot_inputs.items():
         p = ax.bar(x_names, shares, width, label=names, bottom=bottom)
         bottom += shares
     
-    ax.set_title("Classes, their share over all data with relative train, valid, test shares")
+    ax.set_title("Classes, their share [%] over all data with relative train, valid, test shares")
+    ax.set_ylabel("Absolute Percentage w.r.t entire data")
+
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+
     ax.legend(loc="upper right")
 
-    plt.savefig("../results/shares.png")
+    plt.savefig("../results/shares.png", dpi=400)
 
     return output

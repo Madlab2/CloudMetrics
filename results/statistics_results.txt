@@ -1,0 +1,47 @@
+Number of Points per relevant Class in Dataset Train:
+	#Points in class Road:	25414210 | Relative share within this dataset: 54.55%
+	#Points in class Ground:	7000941 | Relative share within this dataset: 15.03%
+	#Points in class Wall Surface:	10129300 | Relative share within this dataset: 21.74%
+	#Points in class Roof Surface:	424834 | Relative share within this dataset: 0.91%
+	#Points in class Doors:	319002 | Relative share within this dataset: 0.68%
+	#Points in class Windows:	1567310 | Relative share within this dataset: 3.36%
+	#Points in class Building Installations:	1734645 | Relative share within this dataset: 3.72%
+
+
+Number of Points per relevant Class in Dataset Valid:
+	#Points in class Road:	1626339 | Relative share within this dataset: 61.94%
+	#Points in class Ground:	288370 | Relative share within this dataset: 10.98%
+	#Points in class Wall Surface:	350965 | Relative share within this dataset: 13.37%
+	#Points in class Roof Surface:	3792 | Relative share within this dataset: 0.14%
+	#Points in class Doors:	14148 | Relative share within this dataset: 0.54%
+	#Points in class Windows:	144483 | Relative share within this dataset: 5.5%
+	#Points in class Building Installations:	197756 | Relative share within this dataset: 7.53%
+
+
+Number of Points per relevant Class in Dataset Test:
+	#Points in class Road:	12356375 | Relative share within this dataset: 39.91%
+	#Points in class Ground:	4286818 | Relative share within this dataset: 13.85%
+	#Points in class Wall Surface:	10534010 | Relative share within this dataset: 34.03%
+	#Points in class Roof Surface:	95422 | Relative share within this dataset: 0.31%
+	#Points in class Doors:	324687 | Relative share within this dataset: 1.05%
+	#Points in class Windows:	2486616 | Relative share within this dataset: 8.03%
+	#Points in class Building Installations:	873988 | Relative share within this dataset: 2.82%
+
+
+Distribution of each class between Train, Validatio, Test:
+	Class Road: Train 64.51%, Validation: 4.13%, Test: 31.36%
+	Class Ground: Train 60.48%, Validation: 2.49%, Test: 37.03%
+	Class Wall Surface: Train 48.2%, Validation: 1.67%, Test: 50.13%
+	Class Roof Surface: Train 81.07%, Validation: 0.72%, Test: 18.21%
+	Class Doors: Train 48.49%, Validation: 2.15%, Test: 49.36%
+	Class Windows: Train 37.33%, Validation: 3.44%, Test: 59.23%
+	Class Building Installations: Train 61.81%, Validation: 7.05%, Test: 31.14%
+
+Total Share of each class over all datasets:
+	Class Road: 49.14%
+	Class Ground: 14.44%
+	Class Wall Surface: 26.21%
+	Class Roof Surface: 0.65%
+	Class Doors: 0.82%
+	Class Windows: 5.24%
+	Class Building Installations: 3.5%
