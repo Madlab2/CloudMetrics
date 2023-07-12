@@ -1,16 +1,14 @@
 import numpy as np
 import laspy
 import classes, helper, metric
+import matplotlib.pyplot as plt
 
 def cloud_statistic(pc_path_1, pc_path_2=None, name=None):
-    output = "Number of Points per relevant Class in Dataset " + str(name) + ":\n\n"
-    
-    class_indices = list(classes.CLASS_DESCRIPTIONS_REAL.keys())
-    pc_1 = laspy.read(pc_path_1)
+    output = "Number of Points per relevant Class in Dataset " + str(name) + ":\n"
 
-    # filter classes
+    pc_1 = laspy.read(pc_path_1)
     points_1 = pc_1.points
-    # list of np arrays
+    
     points_1_class_wise = metric.class_split_pc(points_1, type='real')
     
     class_point_counts = []
@@ -36,10 +34,9 @@ def cloud_statistic(pc_path_1, pc_path_2=None, name=None):
 
     for point_count in class_point_counts:
         class_key = keys[idx]
-        output += f"\t#Points in class {classes.CLASSES_FOR_M3C2_REAL[class_key]} = {point_count}\n"
+        output += f"\t#Points in class {classes.CLASSES_FOR_M3C2_REAL[class_key]}:\t{point_count} | Relative share within this dataset: {round(point_count / np.sum(class_point_counts), 2)}%\n"
         idx += 1
 
-    
     return output, class_point_counts
 
 
@@ -55,22 +52,50 @@ def compute_data_distribution(path_train_1, path_train_2, path_valid, path_test)
     test_point_counts = np.array(test_point_counts)
     all_point_counts = train_point_counts + valid_point_counts + test_point_counts
 
+    # points of one class in train/valid/test over all points of this class
     relativ_point_counts_train = 100 * train_point_counts / all_point_counts
     relativ_point_counts_valid = 100 * valid_point_counts / all_point_counts
     relativ_point_counts_test = 100 * test_point_counts / all_point_counts
 
-    output += "Distribution of each class over Train, Validatio, Test:\n"
+    # number of points of one class in all datasets combined over total number of points in all datasets
+    class_shares_total = 100 * all_point_counts / np.sum(all_point_counts)
+
+    output += "Distribution of each class between Train, Validatio, Test:\n"
+    output2 = "\nTotal Share of each class over all datasets:\n"
+    keys = list(classes.CLASSES_FOR_M3C2_REAL.keys())
 
     idx = 0
-    keys = list(classes.CLASSES_FOR_M3C2_REAL.keys())
-    
     for idx in range(len(all_point_counts)):
         class_key = keys[idx]
-        output += f"\tClass {classes.CLASSES_FOR_M3C2_REAL[class_key]}: Train {round(relativ_point_counts_train[idx], 2)}%, Validation: {round(relativ_point_counts_valid[idx], 2)}%, Test: {round(relativ_point_counts_test[idx], 2)}%\n"
+        class_name = classes.CLASSES_FOR_M3C2_REAL[class_key]
+        output2 += f"\tClass {class_name}: {round(class_shares_total[idx], 2)}%\n"
+        output += f"\tClass {class_name}: Train {round(relativ_point_counts_train[idx], 2)}%, Validation: {round(relativ_point_counts_valid[idx], 2)}%, Test: {round(relativ_point_counts_test[idx], 2)}%\n"
         idx += 1
     
+    output += output2
+
     output_file_path = "../results/statistics_results.txt"
     with open(output_file_path, "w") as file:
         file.write(output)
+
+    # plot and save image
+    x_names = list(classes.CLASSES_FOR_M3C2_REAL.values())
+    width = 0.4
+    bar_plot_inputs = dict()
+    
+    bar_plot_inputs['Train'] = class_shares_total * relativ_point_counts_train
+    bar_plot_inputs['Validation'] = class_shares_total * relativ_point_counts_valid
+    bar_plot_inputs['Test'] = class_shares_total * relativ_point_counts_test
+
+    fig, ax = plt.subplots()
+    bottom = np.zeros(len(x_names))
+    for names, shares in bar_plot_inputs.items():
+        p = ax.bar(x_names, shares, width, label=names, bottom=bottom)
+        bottom += shares
+    
+    ax.set_title("Classes, their share over all data with relative train, valid, test shares")
+    ax.legend(loc="upper right")
+
+    plt.savefig("../results/shares.png")
 
     return output
