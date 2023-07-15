@@ -14,6 +14,12 @@ Clone the repository and **change your docker mount path** in the devcontainer.j
 
 Currently, operations like computing the Convex Hull and Haussdorff Metric are too intensive to be performed in the notebook. Instead, there are two scripts, one for computing the convex hulls of the two point clouds, a second one for computing the haussdrof Distance (optionally using these hulls, then it will take only a few seconds instead of ~10 min to compute).
 
+For Metric Script, run
+```bash
+cd src
+python3 metric.py <path/to/pc_real> <path/to/pc_synthetic> 
+```
+
 To run the hull compution script, open a terminal and run
 ```bash
 cd src
