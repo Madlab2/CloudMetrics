@@ -11,12 +11,23 @@ logging.basicConfig(level=logging.INFO)
 output_file_path = "../results/metrics_results.txt"
 OUTPUT = "Metrics Results\n"
 
-EVERY_NTH = 1000
+# m3c2 = py4dgeo.M3C2(epochs=(epoch1, epoch2),
+#                 corepoints=corepoints,
+#                 cyl_radii=(0.21,),
+#                 normal_radii=(0.2, 0.4, 0.8), # multi scale search ("compute_multiscale_directions()")
+#                 max_distance=10
+#                 )
+
+# M3C2 Params
+EVERY_NTH = [5000, 2500, 2500, 1, 1, 10, 100] # Road Ground Wall Roof Door Window Building Installation
+CYL_RADIUS = 0.21
+NORMAL_RADII = [0.21, 0.42, 0.84]
+MAX_DISTANCE = 10
+
 MIN_POINTS = 20
 NAN_THRESHOLD = 0.9
 MIN_NUM_DISTANCES = 50
 SPARSING_C2C = 1
-
 
 CLASS_NUM_TO_WEIGHT = {
     0: 0.1,     # Road
@@ -27,10 +38,8 @@ CLASS_NUM_TO_WEIGHT = {
     5: 0.15,    # Windows
     6: 0.15,    # Building Installation
 }
-
 DISTANCE_WEIGHTS = np.array([0.6, 0.4]) # M3C2, C2C
 METRIC_WEIGHTS = np.array([0.6, 0.2, 0.2]) # M3C2, C2C, MIoU
-
 SLOPE_FACTOR = -0.2
 
 def iou_eval_function(mean_iou):
@@ -110,7 +119,7 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     logging.info("Computing MeanIoU")
     weighted_mean_iou, _ = class_wise_iou(real_points_class_wise, synth_points_class_wise)
     m_iou_factor = iou_eval_function(weighted_mean_iou)
-    OUTPUT += f"Weighted MeanIoU = {round(100 * weighted_mean_iou, 4)} %\nMeanIoU Factor = {m_iou_factor}\n"
+    OUTPUT += f"\nWeighted MeanIoU = {round(100 * weighted_mean_iou, 4)} %\nMeanIoU Factor = {m_iou_factor}\n"
 
     logging.info(f"Calculating Metric")
     metric = metric_eval_function(mean_m3C2, c2c_mean_dist, m_iou_factor)
@@ -170,7 +179,6 @@ def class_wise_iou(real_points_class_wise, synth_points_class_wise):
 
     return weighted_mean_iou, class_wise_iou
 
-
 def laspy_to_np_array(laspy_points, sparsing_factor=1):
     x = laspy_points['x'][::sparsing_factor]
     y = laspy_points['y'][::sparsing_factor]
@@ -196,13 +204,12 @@ def class_split_pc(points_all_classes, type=None):
     
     return class_wise_points
 
-
-
 def m3c2_class_wise(real_points_class_wise, synth_points_class_wise):    
     
     # ensure number of point clouds/classes is the same for real and synth
     assert(len(real_points_class_wise) == len(synth_points_class_wise))
-    
+    assert(len(real_points_class_wise) == len(EVERY_NTH))
+
     class_wise_distances_all = []
     class_wise_distances_results = []
     class_wise_uncertainties_all = []
@@ -220,13 +227,14 @@ def m3c2_class_wise(real_points_class_wise, synth_points_class_wise):
             epoch1 = py4dgeo.Epoch(real_points_class_wise[class_number])
             epoch2 = py4dgeo.Epoch(synth_points_class_wise[class_number])
             
-            corepoints = epoch1.cloud[::EVERY_NTH]
+            corepoints = epoch1.cloud[::EVERY_NTH[class_number]]
 
             #TODO adjust params
             m3c2 = py4dgeo.M3C2(epochs=(epoch1, epoch2),
                 corepoints=corepoints,
-                cyl_radii=(2.0,),
-                normal_radii=(0.5, 1.0, 2.0)
+                cyl_radii=(CYL_RADIUS,),
+                normal_radii=NORMAL_RADII,
+                max_distance=MAX_DISTANCE
                 )
             # run M3C2 calculation and suppress output
             py4dgeo_logger = logging.getLogger("py4dgeo")
@@ -255,8 +263,8 @@ if __name__ == "__main__":
         logging.info("Wrong number of inputs")
         sys.exit()
     if len(sys.argv) == 1:
-        real_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/Train1 - labelled.las'
-        synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/Val_1 - Cloud.las'
+        real_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/train2-labeled.las'
+        synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1.las'
     elif len(sys.argv) == 3:
         real_pc_path = sys.argv[1]
         synth_pc_path = sys.argv[2]
