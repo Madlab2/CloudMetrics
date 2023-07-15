@@ -48,11 +48,12 @@ def metric_eval_function(mean_m3C2, c2c_mean_dist, m_iou_factor):
     metric = 1 - np.exp(SLOPE_FACTOR * scalar_prod)
     return metric
 
-def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
+def compute_metric(real_pc_path, synth_pc_path):
     global OUTPUT
 
     logging.info('Reading & preparing data')
-    real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, shift_real=True, flip_synth=True, crop=True)
+    # crop=False !!!
+    real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, shift_real=True, flip_synth=True, crop=False)
     
     logging.info('Splitting data')
     real_points_class_wise = class_split_pc(real_points_all_classes, type='real')
@@ -266,12 +267,11 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         real_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/train2-labeled.las'
         synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1 - shifted.las'
-        #synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1.las'
     elif len(sys.argv) == 3:
         real_pc_path = sys.argv[1]
         synth_pc_path = sys.argv[2]
     
-    mean_m3C2 = compute_metric(real_pc_path, synth_pc_path, c2c_distance=None)
+    mean_m3C2 = compute_metric(real_pc_path, synth_pc_path)
 
     #global OUTPUT
     with open(output_file_path, "w") as file:
