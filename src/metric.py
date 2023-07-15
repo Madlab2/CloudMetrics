@@ -11,13 +11,6 @@ logging.basicConfig(level=logging.INFO)
 output_file_path = "../results/metrics_results.txt"
 OUTPUT = "Metrics Results\n"
 
-# m3c2 = py4dgeo.M3C2(epochs=(epoch1, epoch2),
-#                 corepoints=corepoints,
-#                 cyl_radii=(0.21,),
-#                 normal_radii=(0.2, 0.4, 0.8), # multi scale search ("compute_multiscale_directions()")
-#                 max_distance=10
-#                 )
-
 # M3C2 Params
 EVERY_NTH = [5000, 2500, 2500, 1, 1, 10, 100] # Road Ground Wall Roof Door Window Building Installation
 CYL_RADIUS = 0.21
@@ -65,19 +58,27 @@ def compute_metric(real_pc_path, synth_pc_path, c2c_distance=None):
     real_points_class_wise = class_split_pc(real_points_all_classes, type='real')
     synth_points_class_wise = class_split_pc(synth_points_all_classes, type='synth')
 
+    for i in range(len(real_points_class_wise)):
+        logging.info(f"#Points real = {len(real_points_class_wise[i])}, synth = {len(synth_points_class_wise[i])}")
+
     logging.info("Computing Class-Wise M3C2 Distances")
     class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes = m3c2_class_wise(real_points_class_wise, synth_points_class_wise)
+    logging.info(f"Skipped Classes: {skipped_classes}")
     
     classes_to_ignore = []
     OUTPUT += "\nM3C2 Medians for each class:\n"
+    idx = 0
     for class_number, median_distance, mean_distance, stdev in class_wise_distances_results:
+        
         class_idx = list(classes.CLASSES_FOR_M3C2_REAL.keys())[class_number]
         class_name = classes.CLASSES_FOR_M3C2_REAL[class_idx]
-        num_distances = len(class_wise_distances_all[class_number])
-        nan_ratio = np.sum(np.isnan(class_wise_distances_all[class_number]))/num_distances
+
+        num_distances = len(class_wise_distances_all[idx])
+        nan_ratio = np.sum(np.isnan(class_wise_distances_all[idx]))/num_distances
         OUTPUT += f"\n\tClass {class_name} ({class_number}):\n\t\tMedian distance = {median_distance},\n\t\tMean distance = {mean_distance},\n\t\tStandard Deviation = {stdev},\n\t\t#distances: {num_distances},\n\t\tNan-Ratio: {nan_ratio}\n"
         if np.isnan(median_distance) or nan_ratio > NAN_THRESHOLD or num_distances < MIN_NUM_DISTANCES:
             classes_to_ignore.append(class_number)
+        idx += 1
     
     OUTPUT += "\nM3C2 Ignored classes (not enough non-NaN distances):\n"
     for class_number in classes_to_ignore:
@@ -264,7 +265,8 @@ if __name__ == "__main__":
         sys.exit()
     if len(sys.argv) == 1:
         real_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/train2-labeled.las'
-        synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1.las'
+        synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1 - shifted.las'
+        #synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1.las'
     elif len(sys.argv) == 3:
         real_pc_path = sys.argv[1]
         synth_pc_path = sys.argv[2]
