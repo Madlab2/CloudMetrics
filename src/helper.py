@@ -105,37 +105,46 @@ def apply_y_flip(point_cloud):
     point_cloud_flipped.y = -y_points
     return point_cloud_flipped
 
-def crop_points(points, bounding_box):
-    """
-    Crop a point cloud based on a given bounding box.
+def grid_filter(points1, points2, min_xyz, max_xyz, grid_size=5):
+    points1_2d = np.column_stack((points1.x, points1.y))
+    points2_2d = np.column_stack((points2.x, points2.y))
 
-    Parameters:
-        points (LasPointRecord): The input point cloud data points.
-        bounding_box (list): The bounding box coordinates in the order [min_x, min_y, min_z, max_x, max_y, max_z].
+    # Calculate the positive grid dimensions for X and Y
+    grid_dim_x = np.abs(max_xyz[0] - min_xyz[0])
+    grid_dim_y = np.abs(max_xyz[1] - min_xyz[1])
 
-    Returns:
-        LasPointRecord: The cropped point cloud data points containing points within the specified bounding box.
-    
-    Note:
-        - The function preserves all the data in the `points` object, including x, y, z coordinates, intensity,
-        classification, and any other available attributes, for the points that are within the specified bounding box.
-        - Header Information of the point cloud is not updated (e.g. min and max values)
-    """
-    # Extract x, y, z coordinates from points
-    x = np.abs(points.x)
-    y = np.abs(points.y)
-    z = np.abs(points.z)
+    for i in range(len(max_xyz)):
+        if min_xyz[i] > max_xyz[i]:
+            temp = min_xyz[i]
+            min_xyz[i] = max_xyz[i]
+            max_xyz[i] = temp
 
-    # bounding box coordinates
-    min_x, min_y, min_z, max_x, max_y, max_z = np.abs(bounding_box)
+    # Create the grid based on the positive grid dimensions
 
-    # Select the points within the bounding box
-    mask = ((x >= min_x) & (x <= max_x) &
-            (y >= min_y) & (y <= max_y) &
-            (z >= min_z) & (z <= max_z))
+    grid_x = np.arange(0, grid_dim_x + grid_size, grid_size) + min_xyz[0]
+    grid_y = np.arange(0, grid_dim_y + grid_size, grid_size) + min_xyz[1]
+   
+    # Ensure that both point clouds have non-empty data
+    if len(points1_2d) == 0 or len(points2_2d) == 0:
+        return np.array([]), np.array([])
 
-    return points[mask]
+    # Create a 2D histogram for both point clouds
+    hist1, x_edges, y_edges = np.histogram2d(points1_2d[:, 0], points1_2d[:, 1], bins=(grid_x, grid_y))
+    hist2, _, _ = np.histogram2d(points2_2d[:, 0], points2_2d[:, 1], bins=(x_edges, y_edges))
 
+    # Find the indices of grid cells containing points from both point clouds
+    overlapping_grid_indices = (hist1 > 0) & (hist2 > 0)
+
+    # Filter points from both point clouds based on the overlapping grid cells
+    grid_indices_x = np.clip(np.digitize(points1_2d[:, 0], grid_x) - 1, 0, len(x_edges) - 2)
+    grid_indices_y = np.clip(np.digitize(points1_2d[:, 1], grid_y) - 1, 0, len(y_edges) - 2)
+    filtered_points1 = points1[overlapping_grid_indices[grid_indices_x, grid_indices_y]]
+
+    grid_indices_x = np.clip(np.digitize(points2_2d[:, 0], grid_x) - 1, 0, len(x_edges) - 2)
+    grid_indices_y = np.clip(np.digitize(points2_2d[:, 1], grid_y) - 1, 0, len(y_edges) - 2)
+    filtered_points2 = points2[overlapping_grid_indices[grid_indices_x, grid_indices_y]]
+
+    return filtered_points1, filtered_points2
 
 def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True, flip_synth=True, crop=False):
     """
@@ -189,8 +198,7 @@ def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True
     padding = 1.0
     min_xyz = np.maximum(min_borders_real, min_borders_synth) 
     max_xyz = np.minimum(max_borders_real, max_borders_synth)
-    bounding_box = np.add(np.concatenate((min_xyz, max_xyz)), [-padding, -padding, -padding, padding, padding, padding])
-    cropped_points_real = crop_points(filtered_points_real, bounding_box)
-    cropped_points_synth = crop_points(filtered_points_synth, bounding_box)
+
+    cropped_points_real, cropped_points_synth = grid_filter(filtered_points_real, filtered_points_synth, min_xyz, max_xyz, grid_size=5)
 
     return cropped_points_real, cropped_points_synth

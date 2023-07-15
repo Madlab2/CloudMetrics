@@ -12,7 +12,7 @@ output_file_path = "../results/metrics_results.txt"
 OUTPUT = "Metrics Results\n"
 
 # M3C2 Params
-EVERY_NTH = [5000, 2500, 2500, 1, 1, 10, 100] # Road Ground Wall Roof Door Window Building Installation
+EVERY_NTH = [5000, 2500, 2500, 1, 1, 10, 100] # Road, Ground, Wall, Roof, Door, Window, Building Installation
 CYL_RADIUS = 0.21
 NORMAL_RADII = [0.21, 0.42, 0.84]
 MAX_DISTANCE = 10
@@ -20,7 +20,8 @@ MAX_DISTANCE = 10
 MIN_POINTS = 20
 NAN_THRESHOLD = 0.9
 MIN_NUM_DISTANCES = 50
-SPARSING_C2C = 1
+
+SPARSING_C2C = 10
 
 CLASS_NUM_TO_WEIGHT = {
     0: 0.1,     # Road
@@ -52,15 +53,12 @@ def compute_metric(real_pc_path, synth_pc_path):
     global OUTPUT
 
     logging.info('Reading & preparing data')
-    # crop=False !!!
-    real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, shift_real=True, flip_synth=True, crop=False)
+    
+    real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, shift_real=True, flip_synth=True, crop=True)
     
     logging.info('Splitting data')
     real_points_class_wise = class_split_pc(real_points_all_classes, type='real')
     synth_points_class_wise = class_split_pc(synth_points_all_classes, type='synth')
-
-    for i in range(len(real_points_class_wise)):
-        logging.info(f"#Points real = {len(real_points_class_wise[i])}, synth = {len(synth_points_class_wise[i])}")
 
     logging.info("Computing Class-Wise M3C2 Distances")
     class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes = m3c2_class_wise(real_points_class_wise, synth_points_class_wise)
