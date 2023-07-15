@@ -13,15 +13,17 @@ OUTPUT = "Metrics Results\n"
 
 # M3C2 Params
 EVERY_NTH = [5000, 2500, 2500, 1, 1, 10, 100] # Road, Ground, Wall, Roof, Door, Window, Building Installation
-CYL_RADIUS = 0.21
-NORMAL_RADII = [0.21, 0.42, 0.84]
-MAX_DISTANCE = 10
+CYL_RADIUS = 0.21 # meters
+NORMAL_RADII = [0.21, 0.42, 0.84] # meters
+MAX_DISTANCE = 10 # meters
 
 MIN_POINTS = 20
 NAN_THRESHOLD = 0.9
 MIN_NUM_DISTANCES = 50
 
-SPARSING_C2C = 10
+SPARSING_C2C = 10 # 1/10
+
+IOU_VOXEL_SIZE = 0.5 # meters
 
 CLASS_NUM_TO_WEIGHT = {
     0: 0.1,     # Road
@@ -115,9 +117,10 @@ def compute_metric(real_pc_path, synth_pc_path):
     
     c2c_mean_dist = np.mean([c2c_mean_dist_fwd, c2c_mean_dist_bkwd])
     OUTPUT += f"Cloud2Cloud mean distance = {c2c_mean_dist}\n"
+    
     # Interesection over Union
     logging.info("Computing MeanIoU")
-    weighted_mean_iou, _ = class_wise_iou(real_points_class_wise, synth_points_class_wise)
+    weighted_mean_iou, _ = class_wisevoxel_iou(real_points_class_wise, synth_points_class_wise)
     m_iou_factor = iou_eval_function(weighted_mean_iou)
     OUTPUT += f"\nWeighted MeanIoU = {round(100 * weighted_mean_iou, 4)} %\nMeanIoU Factor = {m_iou_factor}\n"
 
@@ -130,10 +133,10 @@ def compute_metric(real_pc_path, synth_pc_path):
     distance = distance_weights.dot(distance_vector)
 
     OUTPUT += "\n-----------------------------\nSummary:"
-    OUTPUT += f"\nFinal Cloud Comparison Metric = {metric}"
-    OUTPUT += f"\nWeighed Cloud Distance (M3C2 and C2C) = {distance}\n\n"
-    OUTPUT += f"WeightedMeanM3C2 = {mean_m3C2}\n"
-    OUTPUT += f"Cloud2Cloud mean distance = {c2c_mean_dist}\n"
+    OUTPUT += f"\nFinal Cloud Comparison Metric = {round(metric, 4)}"
+    OUTPUT += f"\nWeighed Cloud Distance (M3C2 and C2C) = {round(distance, 4)}\n\n"
+    OUTPUT += f"WeightedMeanM3C2 = {round(mean_m3C2, 4)}\n"
+    OUTPUT += f"Cloud2Cloud mean distance = {round(c2c_mean_dist, 4)}\n"
     OUTPUT += f"Weighted MeanIoU = {round(100 * weighted_mean_iou, 4)}%"
 
     return metric, distance
@@ -157,23 +160,38 @@ def cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes):
     stdev = np.nanstd(distances)
     return median_distance, mean_dist, stdev
 
-def class_wise_iou(real_points_class_wise, synth_points_class_wise):
+def class_wisevoxel_iou(real_points_class_wise, synth_points_class_wise):
     global OUTPUT
     idx = 0
     class_wise_iou = []
-    logging.info("\tIoU: Calculating Class Wise IoU")
+    
+    logging.info("\tIoU: Calculating for each Class")
     OUTPUT += "\nIntersection over Union (IoU) for each class:"
-    for class_points_real, class_points_synth in tqdm(zip(real_points_class_wise, synth_points_class_wise), bar_format='\t\t{l_bar}{bar}'):
-        intersection_count = len(np.intersect1d(class_points_real, class_points_synth))
-        union_count = len(np.union1d(class_points_real, class_points_synth))
-        iou = intersection_count / union_count
-        class_wise_iou.append(iou)
 
+    for class_points_real, class_points_synth in tqdm(zip(real_points_class_wise, synth_points_class_wise), bar_format='\t\t{l_bar}{bar}'):
+     
+        max_xyz = np.maximum(np.max(class_points_real, axis=0), np.max(class_points_synth, axis=0))
+        min_xyz = np.minimum(np.min(class_points_real, axis=0), np.min(class_points_synth, axis=0))
+
+        voxel_grid_dim_xyz = np.abs(max_xyz - min_xyz)
+        
+        grid_x = np.arange(0, voxel_grid_dim_xyz[0] + IOU_VOXEL_SIZE, IOU_VOXEL_SIZE) + min_xyz[0]
+        grid_y = np.arange(0, voxel_grid_dim_xyz[1] + IOU_VOXEL_SIZE, IOU_VOXEL_SIZE) + min_xyz[1]
+        grid_z = np.arange(0, voxel_grid_dim_xyz[2] + IOU_VOXEL_SIZE, IOU_VOXEL_SIZE) + min_xyz[2]
+        
+        hist_real, _ = np.histogramdd(class_points_real, bins=(grid_x, grid_y, grid_z))
+        hist_synth, _ = np.histogramdd(class_points_synth, bins=(grid_x, grid_y, grid_z))
+        
+        intersection = np.sum(np.logical_and(hist_real > 0, hist_synth > 0))
+        union = np.sum(np.logical_or(hist_real > 0, hist_synth > 0))
+        iou_per_voxel = intersection / union
+        class_wise_iou.append(iou_per_voxel)
+        
         class_number = list(classes.CLASSES_FOR_M3C2_REAL.keys())[idx]
         class_name = classes.CLASSES_FOR_M3C2_REAL[class_number]
-        OUTPUT += f"\n\tClass {class_name} ({class_number}):\t IoU = {round(100 * iou, 2)} %"
+        OUTPUT += f"\n\tClass {class_name} ({class_number}):\t IoU = {round(100 * iou_per_voxel, 2)} %"
         idx += 1
-
+    
     weights = np.array(list(CLASS_NUM_TO_WEIGHT.values())).T
     weighted_mean_iou = weights.dot(class_wise_iou)
 
