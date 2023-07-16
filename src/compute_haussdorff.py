@@ -32,7 +32,7 @@ def hausdorff_distance_with_tree(path_pc_real, path_pc_synth, path_hull_real=Non
     Returns:
         float: The Hausdorff distance between the two point clouds.
     """
-    cropped_points_1, cropped_points_2 = helper.import_and_prepare_point_clouds(path_pc_real, path_pc_synth)
+    cropped_points_1, cropped_points_2 = helper.import_and_prepare_point_clouds(path_pc_real, path_pc_synth, crop=True)
     
     # extract purely the coordinates of the points
     cropped_xyz_1 = cropped_points_1[['x', 'y', 'z']]
@@ -106,23 +106,23 @@ if __name__ == "__main__":
         print("Wrong number of inputs")
         sys.exit()
     if len(sys.argv) == 1:
-        path_pc_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/Train1 - labelled.las'
-        path_pc_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/Val_1 - Cloud.las'
+        path_pc_real = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/Train1 - labelled.las'
+        path_pc_synth = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/Val_1 - Cloud.las'
         #path_hull_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
         #path_hull_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
         path_hull_1 = None
         path_hull_2 = None
     elif len(sys.argv) == 3:
-        path_pc_1 = sys.argv[1]
-        path_pc_2 = sys.argv[2]
+        path_pc_real = sys.argv[1]
+        path_pc_synth = sys.argv[2]
         path_hull_1 = None
         path_hull_2 = None
     else:
-        path_pc_1 = sys.argv[1]
-        path_pc_2 = sys.argv[2]
+        path_pc_real = sys.argv[1]
+        path_pc_synth = sys.argv[2]
         path_hull_1 = sys.argv[3]
         path_hull_2 = sys.argv[4]
     
-    d_haussd = hausdorff_distance_with_tree(path_pc_real=path_pc_1, path_pc_synth=path_pc_2,
+    d_haussd = hausdorff_distance_with_tree(path_pc_real=path_pc_real, path_pc_synth=path_pc_synth,
                     path_hull_real=path_hull_1, path_hull_synth=path_hull_2)
     print(d_haussd)

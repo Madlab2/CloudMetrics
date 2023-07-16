@@ -4,39 +4,14 @@ import numpy as np
 import py4dgeo, open3d
 from tqdm import tqdm
 import os, sys
-import helper, classes
+import helper, classes, params
 
 logging.basicConfig(level=logging.INFO)
 
 output_file_path = "../results/metrics_results.txt"
 OUTPUT = "Metrics Results\n"
 
-# M3C2 Params
-EVERY_NTH = [5000, 2500, 2500, 1, 1, 10, 100] # Road, Ground, Wall, Roof, Door, Window, Building Installation
-CYL_RADIUS = 0.21 # meters
-NORMAL_RADII = [0.21, 0.42, 0.84] # meters
-MAX_DISTANCE = 10 # meters
 
-MIN_POINTS = 20
-NAN_THRESHOLD = 0.9
-MIN_NUM_DISTANCES = 50
-
-SPARSING_C2C = 10 # 1/10
-
-IOU_VOXEL_SIZE = 0.5 # meters
-
-CLASS_NUM_TO_WEIGHT = {
-    0: 0.1,     # Road
-    1: 0.1,     # Ground
-    2: 0.2,     # Wall Surface
-    3: 0.15,    # Roof Surface
-    4: 0.15,    # Doors
-    5: 0.15,    # Windows
-    6: 0.15,    # Building Installation
-}
-DISTANCE_WEIGHTS = np.array([0.6, 0.4]) # M3C2, C2C
-METRIC_WEIGHTS = np.array([0.6, 0.2, 0.2]) # M3C2, C2C, MIoU
-SLOPE_FACTOR = -0.2
 
 def iou_eval_function(mean_iou):
     #return (1 - mean_iou) * np.exp(1-2*mean_iou)
@@ -46,17 +21,16 @@ def iou_eval_function(mean_iou):
 def metric_eval_function(mean_m3C2, c2c_mean_dist, m_iou_factor):
     # returns something between 0 and 1
     metrics_vec = np.abs(np.array([mean_m3C2, c2c_mean_dist, m_iou_factor]))
-    weight_vec = METRIC_WEIGHTS.T
+    weight_vec = params.METRIC_WEIGHTS.T
     scalar_prod = weight_vec.dot(metrics_vec)
-    metric = 1 - np.exp(SLOPE_FACTOR * scalar_prod)
+    metric = 1 - np.exp(params.SLOPE_FACTOR * scalar_prod)
     return metric
 
 def compute_metric(real_pc_path, synth_pc_path):
     global OUTPUT
 
     logging.info('Reading & preparing data')
-    
-    real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, shift_real=True, flip_synth=True, crop=True)
+    real_points_all_classes, synth_points_all_classes = helper.import_and_prepare_point_clouds(real_pc_path, synth_pc_path, crop=True)
     
     logging.info('Splitting data')
     real_points_class_wise = class_split_pc(real_points_all_classes, type='real')
@@ -77,7 +51,7 @@ def compute_metric(real_pc_path, synth_pc_path):
         num_distances = len(class_wise_distances_all[idx])
         nan_ratio = np.sum(np.isnan(class_wise_distances_all[idx]))/num_distances
         OUTPUT += f"\n\tClass {class_name} ({class_number}):\n\t\tMedian distance = {median_distance},\n\t\tMean distance = {mean_distance},\n\t\tStandard Deviation = {stdev},\n\t\t#distances: {num_distances},\n\t\tNan-Ratio: {nan_ratio}\n"
-        if np.isnan(median_distance) or nan_ratio > NAN_THRESHOLD or num_distances < MIN_NUM_DISTANCES:
+        if np.isnan(median_distance) or nan_ratio > params.NAN_THRESHOLD or num_distances < params.MIN_NUM_DISTANCES:
             classes_to_ignore.append(class_number)
         idx += 1
     
@@ -95,7 +69,7 @@ def compute_metric(real_pc_path, synth_pc_path):
         classes_to_ignore.append(class_number)
     
     # We need to remove weights for classes where distance is NaN and ignored classes. Renormalize weights (sum==1)
-    weights = np.array([CLASS_NUM_TO_WEIGHT.get(class_number) for class_number in CLASS_NUM_TO_WEIGHT if class_number not in classes_to_ignore])
+    weights = np.array([params.CLASS_NUM_TO_WEIGHT.get(class_number) for class_number in params.CLASS_NUM_TO_WEIGHT if class_number not in classes_to_ignore])
     weights = weights / np.sum(weights)
 
     mean_m3C2 = 0.0
@@ -129,7 +103,7 @@ def compute_metric(real_pc_path, synth_pc_path):
 
     logging.info(f"Calculating Distance")
     distance_vector = np.array([mean_m3C2, c2c_mean_dist])
-    distance_weights = DISTANCE_WEIGHTS.T
+    distance_weights = params.DISTANCE_WEIGHTS.T
     distance = distance_weights.dot(distance_vector)
 
     OUTPUT += "\n-----------------------------\nSummary:"
@@ -141,10 +115,63 @@ def compute_metric(real_pc_path, synth_pc_path):
 
     return metric, distance
 
+def m3c2_class_wise(real_points_class_wise, synth_points_class_wise):    
+    
+    # ensure number of point clouds/classes is the same for real and synth
+    assert(len(real_points_class_wise) == len(synth_points_class_wise))
+    assert(len(real_points_class_wise) == len(params.EVERY_NTH))
+
+    class_wise_distances_all = []
+    class_wise_distances_results = []
+    class_wise_uncertainties_all = []
+    skipped_classes = []
+
+    logging.info('\tM3C2: Calculating distances...')
+    for class_number in tqdm(range(len(real_points_class_wise)), bar_format='\t\t{l_bar}{bar}'):
+        
+        if len(real_points_class_wise[class_number]) < params.MIN_POINTS or len(synth_points_class_wise[class_number]) < params.MIN_POINTS:
+            # not enough points for meaningful calculation
+            logging.info("M3C2: Class {} has not enough points and is skipped".format(classes.CLASSES_FOR_M3C2_REAL[list(classes.CLASSES_FOR_M3C2_REAL.keys())[class_number]]))
+            skipped_classes.append(class_number)
+        else:
+            # m3c2 needs special epoch data type, timestamp is optional 
+            epoch1 = py4dgeo.Epoch(real_points_class_wise[class_number])
+            epoch2 = py4dgeo.Epoch(synth_points_class_wise[class_number])
+            
+            corepoints = epoch1.cloud[::params.EVERY_NTH[class_number]]
+
+            m3c2 = py4dgeo.M3C2(epochs=(epoch1, epoch2),
+                corepoints=corepoints,
+                cyl_radii=(params.CYL_RADIUS,),
+                normal_radii=params.NORMAL_RADII,
+                max_distance=params.MAX_DISTANCE
+                )
+            # run M3C2 calculation and suppress output
+            py4dgeo_logger = logging.getLogger("py4dgeo")
+            py4dgeo_logger.setLevel(logging.WARNING)
+            distances, uncertainties = m3c2.run()
+            py4dgeo_logger.setLevel(logging.INFO)
+
+            distances = np.array(distances)
+            uncertainties = np.array(uncertainties)
+            
+            # we have nan values, thus special median calculation
+            median_distance = np.nanmedian(distances)
+            mean_distance = np.nanmean(distances)
+            stdev = np.nanstd(distances)
+            #median_uncertainty = np.median(uncertainties["lodetection"])
+
+            class_wise_distances_all.append(distances)
+            class_wise_distances_results.append([class_number, median_distance, mean_distance, stdev])
+            class_wise_uncertainties_all.append(uncertainties)
+            
+
+    return class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes
+
 def cloud_to_cloud_distance(real_points_all_classes, synth_points_all_classes):
     logging.info("\tC2C: Creating Open3D Point Clouds")
-    real_points_np = laspy_to_np_array(real_points_all_classes, sparsing_factor=SPARSING_C2C)
-    synth_points_np = laspy_to_np_array(synth_points_all_classes, sparsing_factor=SPARSING_C2C)
+    real_points_np = laspy_to_np_array(real_points_all_classes, sparsing_factor=params.SPARSING_C2C)
+    synth_points_np = laspy_to_np_array(synth_points_all_classes, sparsing_factor=params.SPARSING_C2C)
 
     real_cloud_o3d = open3d.geometry.PointCloud()
     real_cloud_o3d.points = open3d.utility.Vector3dVector(real_points_np)
@@ -175,9 +202,9 @@ def class_wisevoxel_iou(real_points_class_wise, synth_points_class_wise):
 
         voxel_grid_dim_xyz = np.abs(max_xyz - min_xyz)
         
-        grid_x = np.arange(0, voxel_grid_dim_xyz[0] + IOU_VOXEL_SIZE, IOU_VOXEL_SIZE) + min_xyz[0]
-        grid_y = np.arange(0, voxel_grid_dim_xyz[1] + IOU_VOXEL_SIZE, IOU_VOXEL_SIZE) + min_xyz[1]
-        grid_z = np.arange(0, voxel_grid_dim_xyz[2] + IOU_VOXEL_SIZE, IOU_VOXEL_SIZE) + min_xyz[2]
+        grid_x = np.arange(0, voxel_grid_dim_xyz[0] + params.IOU_VOXEL_SIZE, params.IOU_VOXEL_SIZE) + min_xyz[0]
+        grid_y = np.arange(0, voxel_grid_dim_xyz[1] + params.IOU_VOXEL_SIZE, params.IOU_VOXEL_SIZE) + min_xyz[1]
+        grid_z = np.arange(0, voxel_grid_dim_xyz[2] + params.IOU_VOXEL_SIZE, params.IOU_VOXEL_SIZE) + min_xyz[2]
         
         hist_real, _ = np.histogramdd(class_points_real, bins=(grid_x, grid_y, grid_z))
         hist_synth, _ = np.histogramdd(class_points_synth, bins=(grid_x, grid_y, grid_z))
@@ -192,7 +219,7 @@ def class_wisevoxel_iou(real_points_class_wise, synth_points_class_wise):
         OUTPUT += f"\n\tClass {class_name} ({class_number}):\t IoU = {round(100 * iou_per_voxel, 2)} %"
         idx += 1
     
-    weights = np.array(list(CLASS_NUM_TO_WEIGHT.values())).T
+    weights = np.array(list(params.CLASS_NUM_TO_WEIGHT.values())).T
     weighted_mean_iou = weights.dot(class_wise_iou)
 
     return weighted_mean_iou, class_wise_iou
@@ -222,58 +249,6 @@ def class_split_pc(points_all_classes, type=None):
     
     return class_wise_points
 
-def m3c2_class_wise(real_points_class_wise, synth_points_class_wise):    
-    
-    # ensure number of point clouds/classes is the same for real and synth
-    assert(len(real_points_class_wise) == len(synth_points_class_wise))
-    assert(len(real_points_class_wise) == len(EVERY_NTH))
-
-    class_wise_distances_all = []
-    class_wise_distances_results = []
-    class_wise_uncertainties_all = []
-    skipped_classes = []
-
-    logging.info('\tM3C2: Calculating distances...')
-    for class_number in tqdm(range(len(real_points_class_wise)), bar_format='\t\t{l_bar}{bar}'):
-        
-        if len(real_points_class_wise[class_number]) < MIN_POINTS or len(synth_points_class_wise[class_number]) < MIN_POINTS:
-            # not enough points for meaningful calculation
-            logging.info("M3C2: Class {} has not enough points and is skipped".format(classes.CLASSES_FOR_M3C2_REAL[list(classes.CLASSES_FOR_M3C2_REAL.keys())[class_number]]))
-            skipped_classes.append(class_number)
-        else:
-            # m3c2 needs special epoch data type, timestamp is optional 
-            epoch1 = py4dgeo.Epoch(real_points_class_wise[class_number])
-            epoch2 = py4dgeo.Epoch(synth_points_class_wise[class_number])
-            
-            corepoints = epoch1.cloud[::EVERY_NTH[class_number]]
-
-            #TODO adjust params
-            m3c2 = py4dgeo.M3C2(epochs=(epoch1, epoch2),
-                corepoints=corepoints,
-                cyl_radii=(CYL_RADIUS,),
-                normal_radii=NORMAL_RADII,
-                max_distance=MAX_DISTANCE
-                )
-            # run M3C2 calculation and suppress output
-            py4dgeo_logger = logging.getLogger("py4dgeo")
-            py4dgeo_logger.setLevel(logging.WARNING)
-            distances, uncertainties = m3c2.run()
-            py4dgeo_logger.setLevel(logging.INFO)
-
-            distances = np.array(distances)
-            uncertainties = np.array(uncertainties)
-            # we have nan values, thus special median calculation
-            median_distance = np.nanmedian(distances)
-            mean_distance = np.nanmean(distances)
-            stdev = np.nanstd(distances)
-            #median_uncertainty = np.median(uncertainties["lodetection"])
-
-            class_wise_distances_all.append(distances)
-            class_wise_distances_results.append([class_number, median_distance, mean_distance, stdev])
-            class_wise_uncertainties_all.append(uncertainties)
-            
-
-    return class_wise_distances_results, class_wise_distances_all, class_wise_uncertainties_all, skipped_classes
 
 
 if __name__ == "__main__":
@@ -282,17 +257,19 @@ if __name__ == "__main__":
         sys.exit()
     if len(sys.argv) == 1:
         real_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/train2-labeled.las'
-        synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1 - shifted.las'
+        #synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1 - shifted.las'
+        synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1.las'
     elif len(sys.argv) == 3:
         real_pc_path = sys.argv[1]
         synth_pc_path = sys.argv[2]
     
-    mean_m3C2 = compute_metric(real_pc_path, synth_pc_path)
+    metric, distance = compute_metric(real_pc_path, synth_pc_path)
 
-    #global OUTPUT
+    
     with open(output_file_path, "w") as file:
         file.write(OUTPUT)
-    logging.info(f"Cloud Distance Metric: {mean_m3C2}")
+    logging.info(f"Cloud Distance: {round(distance, 4)} m")
+    logging.info(f"Cloud Metric: {round(metric, 4)}")
     
 
     

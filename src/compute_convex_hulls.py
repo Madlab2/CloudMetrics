@@ -47,7 +47,7 @@ def partitioned_hull_calculation(xyz, save_path, num_partitions=1000):
     return (convex_hull != None)
 
 
-def compute_hulls(path_pc_1, path_pc_2):
+def compute_hulls(path_pc_real, path_pc_synth):
     """
     Computes convex hulls for two point clouds and saves the hull data to files.
 
@@ -59,16 +59,16 @@ def compute_hulls(path_pc_1, path_pc_2):
         - This function imports and prepares the point clouds (class filtering, cropping), extracts the 3D point coordinates, and computes the convex hulls.
         - The convex hull data for each point cloud is saved to separate pickle files.
     """
-    cropped_points_1, cropped_points_2 = helper.import_and_prepare_point_clouds(path_pc_1, path_pc_2)
+    cropped_points_1, cropped_points_2 = helper.import_and_prepare_point_clouds(path_pc_real, path_pc_synth, crop=True)
     
     # extract purely the coordinates of the points
     cropped_xyz_1 = cropped_points_1[['x', 'y', 'z']]
     cropped_xyz_2 = cropped_points_2[['x', 'y', 'z']]
 
-    filename_1, _ = os.path.splitext(path_pc_1)
+    filename_1, _ = os.path.splitext(path_pc_real)
     convex_hull_path_1 = f"{filename_1}_convex_hull.pkl"
 
-    filename_2, _ = os.path.splitext(path_pc_2)
+    filename_2, _ = os.path.splitext(path_pc_synth)
     convex_hull_path_2 = f"{filename_2}_convex_hull.pkl"
 
     # Switch to turn off long computation for debugging/testing of other code parts
@@ -97,10 +97,10 @@ def compute_hulls(path_pc_1, path_pc_2):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        path_pc_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
-        path_pc_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
+        path_pc_real = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
+        path_pc_synth = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
     else:
-        path_pc_1 = sys.argv[1]
-        path_pc_2 = sys.argv[2]
+        path_pc_real = sys.argv[1]
+        path_pc_synth = sys.argv[2]
     
-    compute_hulls(path_pc_1=path_pc_1, path_pc_2=path_pc_2)
+    compute_hulls(path_pc_real=path_pc_real, path_pc_synth=path_pc_synth)

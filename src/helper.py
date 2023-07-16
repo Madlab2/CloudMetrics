@@ -3,8 +3,7 @@ import numpy as np
 import laspy
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
-import classes, offsets
-
+import classes, params
 
 def plot_bev(points, type=None):
     """
@@ -105,7 +104,7 @@ def apply_y_flip(point_cloud):
     point_cloud_flipped.y = -y_points
     return point_cloud_flipped
 
-def grid_filter(points1, points2, min_xyz, max_xyz, grid_size=5):
+def grid_filter(points1, points2, min_xyz, max_xyz):
     points1_2d = np.column_stack((points1.x, points1.y))
     points2_2d = np.column_stack((points2.x, points2.y))
 
@@ -113,6 +112,7 @@ def grid_filter(points1, points2, min_xyz, max_xyz, grid_size=5):
     grid_dim_x = np.abs(max_xyz[0] - min_xyz[0])
     grid_dim_y = np.abs(max_xyz[1] - min_xyz[1])
 
+    # fix negative values swapped between min and max. (Wrongly assigned in las header file)
     for i in range(len(max_xyz)):
         if min_xyz[i] > max_xyz[i]:
             temp = min_xyz[i]
@@ -120,9 +120,8 @@ def grid_filter(points1, points2, min_xyz, max_xyz, grid_size=5):
             max_xyz[i] = temp
 
     # Create the grid based on the positive grid dimensions
-
-    grid_x = np.arange(0, grid_dim_x + grid_size, grid_size) + min_xyz[0]
-    grid_y = np.arange(0, grid_dim_y + grid_size, grid_size) + min_xyz[1]
+    grid_x = np.arange(0, grid_dim_x + params.GRID_FILTER_SIZE, params.GRID_FILTER_SIZE) + min_xyz[0]
+    grid_y = np.arange(0, grid_dim_y + params.GRID_FILTER_SIZE, params.GRID_FILTER_SIZE) + min_xyz[1]
    
     # Ensure that both point clouds have non-empty data
     if len(points1_2d) == 0 or len(points2_2d) == 0:
@@ -146,7 +145,7 @@ def grid_filter(points1, points2, min_xyz, max_xyz, grid_size=5):
 
     return filtered_points1, filtered_points2
 
-def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True, flip_synth=True, crop=False):
+def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, crop=False):
     """
     Imports and prepares two point clouds for comparison.
 
@@ -165,11 +164,12 @@ def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True
     pc_synth = laspy.read(path_pc_synth)
 
     # ensure that both pc are in same reference frame
-    if shift_real == True:
-        pc_real = apply_offset(pc_real, offsets.X_OFFSET_REAL, offsets.Y_OFFSET_REAL, offsets.Z_OFFSET_REAL)
-    if flip_synth == True:
+    if params.FLIP_REAL == True:
+        pc_real = apply_y_flip(pc_real)
+    pc_real = apply_offset(pc_real, params.X_OFFSET_REAL, params.Y_OFFSET_REAL, params.Z_OFFSET_REAL)
+    if params.FLIP_SYNTH == True:
         pc_synth = apply_y_flip(pc_synth)
-    
+    pc_synth = apply_offset(pc_synth, params.X_OFFSET_SYNTH, params.Y_OFFSET_SYNTH, params.Z_OFFSET_SYNTH)
 
     # filter classes
     points_real = pc_real.points
@@ -199,6 +199,6 @@ def import_and_prepare_point_clouds(path_pc_real, path_pc_synth, shift_real=True
     min_xyz = np.maximum(min_borders_real, min_borders_synth) 
     max_xyz = np.minimum(max_borders_real, max_borders_synth)
 
-    cropped_points_real, cropped_points_synth = grid_filter(filtered_points_real, filtered_points_synth, min_xyz, max_xyz, grid_size=5)
+    cropped_points_real, cropped_points_synth = grid_filter(filtered_points_real, filtered_points_synth, min_xyz, max_xyz)
 
     return cropped_points_real, cropped_points_synth
