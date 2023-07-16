@@ -16,11 +16,21 @@ FLIP_REAL = False
 X_OFFSET_REAL = -674000
 Y_OFFSET_REAL = -5405000
 Z_OFFSET_REAL = 0
+
+
+
 # specific values for this project. Needs to be adjusted for other data
 FLIP_SYNTH = True
-X_OFFSET_SYNTH = -0.3
-Y_OFFSET_SYNTH = -1.4
-Z_OFFSET_SYNTH = -1.8
+# Turn on/off the manual alignment of synth point cloud
+ALIGN_SYNTH = False
+if ALIGN_SYNTH:
+    X_OFFSET_SYNTH = -0.3
+    Y_OFFSET_SYNTH = -1.4
+    Z_OFFSET_SYNTH = -1.8
+else:
+    X_OFFSET_SYNTH = 0
+    Y_OFFSET_SYNTH = 0
+    Z_OFFSET_SYNTH = 0
 
 # GRID Filter (removes non-overlapping tiles)
 GRID_FILTER_SIZE = 5 # meters
@@ -57,7 +67,7 @@ CLASS_NUM_TO_WEIGHT = {
     6: 0.15,    # Building Installation
 }
 DISTANCE_WEIGHTS = np.array([0.6, 0.4]) # M3C2, C2C
-METRIC_WEIGHTS = np.array([0.6, 0.2, 0.2]) # M3C2, C2C, MIoU
+METRIC_WEIGHTS = np.array([0.6, 0.3, 0.1]) # M3C2, C2C, MIoU
 
 # bounded growth rate
 SLOPE_FACTOR = -0.2

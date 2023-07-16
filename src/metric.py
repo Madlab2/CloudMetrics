@@ -89,7 +89,7 @@ def compute_metric(real_pc_path, synth_pc_path):
     c2c_median_distance_bkwd, c2c_mean_dist_bkwd, c2c_stdev_bkwd = cloud_to_cloud_distance(synth_points_all_classes, real_points_all_classes)
     OUTPUT += f"\nCloud2Cloud Results Backward:\n\tMedian Distance = {c2c_median_distance_bkwd} \n\tMean Distance = {c2c_mean_dist_bkwd} \n\tStandard Deviation = {c2c_stdev_bkwd}\n"
     
-    c2c_mean_dist = np.mean([c2c_mean_dist_fwd, c2c_mean_dist_bkwd])
+    c2c_mean_dist = np.mean([np.abs(c2c_mean_dist_fwd), np.abs(c2c_mean_dist_bkwd)])
     OUTPUT += f"Cloud2Cloud mean distance = {c2c_mean_dist}\n"
     
     # Interesection over Union

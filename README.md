@@ -21,10 +21,12 @@ Y_OFFSET_REAL = -5405000
 Z_OFFSET_REAL = 0
 
 FLIP_SYNTH = True
+ALIGN_SYNTH = True
 X_OFFSET_SYNTH = -0.3
 Y_OFFSET_SYNTH = -1.4
 Z_OFFSET_SYNTH = -1.8
 ```
+The boolean `ALIGN_SYNTH` determines whether the offsets are applied to the synthetic point cloud or not.
 
 To conduct the compairson, run
 ```bash
