@@ -41,7 +41,7 @@ def cloud_statistic(pc_path_1, pc_path_2=None, name=None):
     return output, class_point_counts
 
 
-def compute_data_distribution(path_train_1, path_train_2, path_valid, path_test):
+def compute_data_distribution(path_train_1, path_train_2, path_valid, path_test, display_bar_percentage=True):
     train_output_string, train_point_counts = cloud_statistic(path_train_1, path_train_2, 'Train')
     valid_output_string, valid_point_counts = cloud_statistic(path_valid, name='Valid')
     test_output_string, test_point_counts = cloud_statistic(path_test, name='Test')
@@ -90,9 +90,24 @@ def compute_data_distribution(path_train_1, path_train_2, path_valid, path_test)
 
     fig, ax = plt.subplots(figsize=(9, 12))
     bottom = np.zeros(len(x_names))
+    relative_point_counts = [relativ_point_counts_train, relativ_point_counts_valid, relativ_point_counts_test]
+    set_counter = 0
     for names, shares in bar_plot_inputs.items():
         p = ax.bar(x_names, shares, width, label=names, bottom=bottom)
         bottom += shares
+        if display_bar_percentage == True:
+            # Add percentage labels to each section of the bar  
+            for i, rect in enumerate(p):
+                x = rect.get_x() + rect.get_width() / 2
+                y = rect.get_y() + rect.get_height() / 2
+                # hack to avoid numbers overlaying with small bars
+                if y < (set_counter + 1):
+                    y = (set_counter + 1)
+                percentage = relative_point_counts[set_counter][i] / 100
+                ax.text(x, y, f"{percentage:.1%}", ha='center', va='top', color='black', fontsize=10)
+            
+            set_counter += 1
+
     
     ax.set_title("Classes, their share [%] over all data with relative train, valid, test shares")
     ax.set_ylabel("Absolute Percentage w.r.t entire data")
