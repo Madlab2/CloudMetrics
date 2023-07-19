@@ -1,6 +1,15 @@
 #!/usr/bin/env python
 import numpy as np
 
+
+############################################
+# Data Paths (default values, useful when debugging)
+############################################
+
+DEFAULT_REAL_PC_PATH = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/train2-labeled.las'
+DEFAULT_SYNTH_PC_PATH = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1.las'
+
+
 ############################################
 # Data Preparation
 ############################################

@@ -6,7 +6,7 @@ from scipy.spatial import ConvexHull
 import pickle
 from tqdm import tqdm
 import os, sys
-import helper
+import helper, params
 
 def partitioned_hull_calculation(xyz, save_path, num_partitions=1000):
     """
@@ -97,8 +97,8 @@ def compute_hulls(path_pc_real, path_pc_synth):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        path_pc_real = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
-        path_pc_synth = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/validation_classified_merge.las'
+        path_pc_real = params.DEFAULT_REAL_PC_PATH
+        path_pc_synth = params.DEFAULT_SYNTH_PC_PATH
     else:
         path_pc_real = sys.argv[1]
         path_pc_synth = sys.argv[2]

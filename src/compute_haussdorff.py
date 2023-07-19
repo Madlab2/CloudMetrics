@@ -7,7 +7,7 @@ import pickle
 from tqdm import tqdm
 import concurrent.futures
 import os, sys
-import helper
+import helper, params
 
 
 def laspy_to_np_array(laspy_points):
@@ -106,10 +106,8 @@ if __name__ == "__main__":
         print("Wrong number of inputs")
         sys.exit()
     if len(sys.argv) == 1:
-        path_pc_real = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/Train1 - labelled.las'
-        path_pc_synth = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/Val_1 - Cloud.las'
-        #path_hull_1 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
-        #path_hull_2 = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/valid/convex_hull_real.pkl'
+        path_pc_real = params.DEFAULT_REAL_PC_PATH
+        path_pc_synth = params.DEFAULT_SYNTH_PC_PATH
         path_hull_1 = None
         path_hull_2 = None
     elif len(sys.argv) == 3:

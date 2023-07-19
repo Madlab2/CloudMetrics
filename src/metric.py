@@ -256,15 +256,13 @@ if __name__ == "__main__":
         logging.info("Wrong number of inputs")
         sys.exit()
     if len(sys.argv) == 1:
-        real_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Labelling/Label-Datasets/train/train2-labeled.las'
-        #synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1 - shifted.las'
-        synth_pc_path = '/home/Meins/Uni/TUM/SS23/Data Lab/Data Sets/Synthetic/synthetic2_1.las'
+        real_pc_path = params.DEFAULT_REAL_PC_PATH
+        synth_pc_path = params.DEFAULT_SYNTH_PC_PATH
     elif len(sys.argv) == 3:
         real_pc_path = sys.argv[1]
         synth_pc_path = sys.argv[2]
     
     metric, distance = compute_metric(real_pc_path, synth_pc_path)
-
     
     with open(output_file_path, "w") as file:
         file.write(OUTPUT)

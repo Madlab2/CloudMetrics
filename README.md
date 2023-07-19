@@ -5,8 +5,8 @@ Suite to compare two point clouds geometrically and semantically.
 This suite is developped for the TUM Data Innovation Lab 2023 to compare synthetically generated point clouds from a city/road environment with real, labelled LiDAR scans from the same area.
 
 ## Requirements
-This suite is only developped/tested on Windows
-- Docker Desktop
+This suite is only developped/tested on Windows 11 pro with
+- Docker Desktop (using WSL2)
 - Visual Studio Code
 
 ## How to use
@@ -42,6 +42,15 @@ Depending on the point cloud sizes, this can take a few minutes. The follwoing o
 6. Cloud Distance is computed as a weighted average between MeanM3C2 and Cloud-to-Cloud results. The weigths are `DISTANCE_WEIGHTS` as defined in `src/params.py`.
 7. Cloud Metric is computed using a bounded growth function in which a weighted average of MeanM3C2, Cloud-to-Cloud and an inverted MeanIoU factor are inserted. The weigths are `METRIC_WEIGHTS` as defined in `src/params.py`. The rate of the growth function is `SLOPE_FACTOR` as defined in `src/params.py`.
 
+Note that the script assumes the two point clouds have substantial overlap. Other cases or wrong alignment parameters can lead to errors.
+
+### Setting hard Path to your Point Clouds
+For convenience while developping/debugging, you can set paths to your real and ssynthetic point cloud in `src/params.py`. Then you can run the script without specifying the paths every time.
+
+```python
+DEFAULT_REAL_PC_PATH = 'path/to/pc_real'
+DEFAULT_SYNTH_PC_PATH = 'path/to/pc_synthetic'
+```
 
 ## Other Tools
 There is also functionality to compute Hausdorff Distances and convex hulls. 
