@@ -4,24 +4,24 @@ import classes, helper, metric
 import matplotlib.pyplot as plt 
 import matplotlib.ticker as mtick
 
-def cloud_statistic(pc_path_1, pc_path_2=None, name=None):
+def cloud_statistic(type, pc_path_1, pc_path_2=None, pc_path_3=None, name=None):
     output = "Number of Points per relevant Class in Dataset " + str(name) + ":\n"
 
     pc_1 = laspy.read(pc_path_1)
     points_1 = pc_1.points
     
-    points_1_class_wise = metric.class_split_pc(points_1, type='real')
+    points_1_class_wise = metric.class_split_pc(points_1, type=type)
     
     class_point_counts = []
     for class_points in points_1_class_wise:
         class_count = len(class_points)
         class_point_counts.append(class_count)
 
-    # if we pass a second dataset in 8e.g. test 2)
+    # if we pass a second dataset in (e.g. train 2)
     if pc_path_2 is not None:
         pc_2 = laspy.read(pc_path_2)
         points_2 = pc_2.points
-        points_2_class_wise = metric.class_split_pc(points_2, type='real')
+        points_2_class_wise = metric.class_split_pc(points_2, type=type)
         
         class_idx = 0
         for class_points in points_2_class_wise:
@@ -29,22 +29,39 @@ def cloud_statistic(pc_path_1, pc_path_2=None, name=None):
             class_point_counts[class_idx] += class_count
             class_idx += 1
     
+    # if we pass a third dataset in (e.g. train 3)
+    if pc_path_3 is not None:
+        pc_3 = laspy.read(pc_path_3)
+        points_3 = pc_3.points
+        points_3_class_wise = metric.class_split_pc(points_3, type=type)
+        
+        class_idx = 0
+        for class_points in points_3_class_wise:
+            class_count = len(class_points)
+            class_point_counts[class_idx] += class_count
+            class_idx += 1
+    
+    if type == 'real':
+        classes_dict = classes.CLASSES_FOR_M3C2_REAL
+    else:
+        classes_dict = classes.CLASSES_FOR_M3C2_SYNTH
+
     idx = 0
-    keys = list(classes.CLASSES_FOR_M3C2_REAL.keys())
+    keys = list(classes_dict.keys())
     assert(len(keys) == len(class_point_counts))
 
     for point_count in class_point_counts:
         class_key = keys[idx]
-        output += f"\t#Points in class {classes.CLASSES_FOR_M3C2_REAL[class_key]}:\t{point_count} | Relative share within this dataset: {round(100 * point_count / np.sum(class_point_counts), 2)}%\n"
+        output += f"\t#Points in class {classes_dict[class_key]}:\t{point_count} | Relative share within this dataset: {round(100 * point_count / np.sum(class_point_counts), 2)}%\n"
         idx += 1
 
     return output, class_point_counts
 
 
-def compute_data_distribution(path_train_1, path_train_2, path_valid, path_test, display_bar_percentage=True):
-    train_output_string, train_point_counts = cloud_statistic(path_train_1, path_train_2, 'Train')
-    valid_output_string, valid_point_counts = cloud_statistic(path_valid, name='Valid')
-    test_output_string, test_point_counts = cloud_statistic(path_test, name='Test')
+def compute_data_distribution(type, path_train_1, path_train_2, path_train_3, path_valid, path_test, display_bar_percentage=True):
+    train_output_string, train_point_counts = cloud_statistic(type, path_train_1, path_train_2, path_train_3, 'Train')
+    valid_output_string, valid_point_counts = cloud_statistic(type, path_valid, name='Valid')
+    test_output_string, test_point_counts = cloud_statistic(type, path_test, name='Test')
 
     output = train_output_string + "\n\n" + valid_output_string + "\n\n" + test_output_string + "\n\n"
 
